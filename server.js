@@ -4,9 +4,41 @@ const U='https://dgoimemvaudwayelcrmg.supabase.co',AK='eyJhbGciOiJIUzI1NiIsInR5c
 const MAIN=['products','customers','sales','bundles'],REC=['suppliers','purchases','expenses','payments','returns','closings','audit','employees','payroll','attendance','leaves','advances','empPay','assets','coupons','quotes','warehouses','transfers','stocktakes','approvals','journals','coa','bankAccts','bankRecs','loyTx','boms','prodOrders','repScheds','repRuns'],COLL=MAIN.concat(REC);
 const SB={sess:null,prof:null,shop:null,me:null,dirty:false,busy:false,pt:null,poll:null,retryTimer:null,retryCount:0,authExpired:false,authWarned:false,loggingOut:false,again:false,changeSeq:0};let last={};window.__orvexStatus=()=>({logged:!!SB.sess,dirty:!!SB.dirty,busy:!!SB.busy,retry:SB.retryCount||0,expired:!!SB.authExpired});
 const em=u=>u+'@users.orvex.app';
+/* ===== بوابة الصلاحيات (ORVEX roles) =====
+   إنشاء المحلات وإدارتها والكتالوج المستقل ودوال المجمعات: للمؤسس فقط.
+   حساب المحل لا يستطيع الوصول لهذه المسارات حتى لو استُدعيت الدوال يدويًا من وحدة التحكم.
+   هذه طبقة دفاع إضافية؛ التنفيذ الفعلي في الخادم (RLS + دالة orvex-admin) ولم يُغيَّر. */
+const isFounderAcct=()=>!!(SB.sess&&SB.prof&&SB.prof.role==='founder');
+const founderOK=()=>SB.sess?isFounderAcct():(typeof isDesigner==='function'&&isDesigner());
+const FN_FOUNDER_ONLY=new Set(['create_shop','delete_shop','update_user','pkg_code']);
+function roleGate(p,o){
+ if(!SB.sess||!SB.prof||SB.prof.role==='founder')return;
+ const role=SB.prof.role,m=String((o&&o.method)||'GET').toUpperCase(),i=p.indexOf('?'),path=i<0?p:p.slice(0,i),qs=new URLSearchParams(i<0?'':p.slice(i+1));
+ const eq=k=>{const v=qs.get(k);return v&&v.startsWith('eq.')?v.slice(3):null},own=SB.shop||'';
+ const deny=()=>{const e=new Error('غير مسموح: هذه الوظيفة للمؤسس فقط');e.status=403;e.gated=true;throw e};
+ let b=null;try{b=o&&o.body?JSON.parse(o.body):null}catch(e){}
+ if(path==='/functions/v1/orvex-mall-admin')deny();
+ if(path==='/functions/v1/orvex-admin'){
+  const a=b&&b.action;
+  if(FN_FOUNDER_ONLY.has(a))deny();
+  if(a==='create_user'&&!(role==='manager'&&own&&b.role==='staff'&&b.shop_id===own))deny();
+  if((a==='reset_password'||a==='delete_user')&&role!=='manager')deny();
+  return}
+ if(path==='/rest/v1/shops'){if(!(own&&eq('id')===own&&(m==='GET'||m==='PATCH')))deny();return}
+ if(path==='/rest/v1/founder_products'||path==='/rest/v1/device_requests')deny();
+ if(path==='/rest/v1/devices'){if(!(m==='GET'&&own&&eq('shop_id')===own))deny();return}
+ if(path==='/rest/v1/shop_audit'){if(!(m==='GET'&&own&&eq('shop_id')===own))deny();return}
+ if(path==='/rest/v1/profiles'){
+  if(m==='GET'){if(!((own&&eq('shop_id')===own)||eq('id')))deny();return}
+  if(m==='PATCH'){if(!(role==='manager'&&eq('id')))deny();return}
+  deny()}
+ if(/^\/rest\/v1\/rpc\/mall_(admin_|set_shop|security_audit)/.test(path))deny();
+}
+window.orvexRole={ok:founderOK,founder:()=>isFounderAcct(),shopAccount:()=>!!(SB.sess&&SB.prof&&(SB.prof.role==='manager'||SB.prof.role==='staff')),gate:roleGate};
+
 const devId=()=>{let d=null;try{d=localStorage.getItem(KEY+'_devid');if(!d){d=(uid()+uid()+uid()).toUpperCase();localStorage.setItem(KEY+'_devid',d)}}catch(e){d=d||uid()+uid()}return d};
 async function tok(){const s=SB.sess;if(!s)return AK;if(SB.authExpired)throw new Error('انتهت جلسة الدخول. احفظ عملك ثم سجّل الخروج وادخل مجددًا.');if(s.exp-Date.now()<60000){let r;try{r=await fetch(U+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:AK,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:s.rt})})}catch(e){throw new Error('تعذر الاتصال لتجديد جلسة الدخول. تحقق من الإنترنت وحاول مجددًا.')}if(!r.ok){if(r.status!==400&&r.status!==401&&r.status!==403)throw new Error('تعذر تجديد جلسة الدخول مؤقتًا (HTTP '+r.status+'). ستتم إعادة المحاولة.');SB.authExpired=true;SB.retryCount=0;clearTimeout(SB.retryTimer);if(!SB.authWarned){SB.authWarned=true;toast('انتهت جلسة الدخول. احفظ عملك ثم سجّل الخروج وادخل مجددًا.')}throw new Error('انتهت جلسة الدخول. سجّل الخروج وادخل مجددًا.')}const j=await r.json();if(!j.access_token||!j.refresh_token){SB.authExpired=true;throw new Error('تعذر تجديد جلسة الدخول. سجّل الدخول مجددًا.')}SB.sess={at:j.access_token,rt:j.refresh_token,exp:Date.now()+j.expires_in*1000,uid:s.uid};SB.authWarned=false}return SB.sess.at}
-async function rq(p,o){o=o||{};const hd=Object.assign({apikey:AK,Authorization:'Bearer '+await tok(),'Content-Type':'application/json'},o.headers||{});let r;try{r=await fetch(U+p,Object.assign({},o,{headers:hd}))}catch(e){const ne=new Error('لا يوجد اتصال بالخادم');ne.network=true;throw ne}const t=await r.text();let j=null;try{j=t?JSON.parse(t):null}catch(e){}if(!r.ok){const er=new Error((j&&(j.error||j.message||j.msg))||'خطأ '+r.status);er.status=r.status;throw er}return j}
+async function rq(p,o){o=o||{};roleGate(p,o);const hd=Object.assign({apikey:AK,Authorization:'Bearer '+await tok(),'Content-Type':'application/json'},o.headers||{});let r;try{r=await fetch(U+p,Object.assign({},o,{headers:hd}))}catch(e){const ne=new Error('لا يوجد اتصال بالخادم');ne.network=true;throw ne}const t=await r.text();let j=null;try{j=t?JSON.parse(t):null}catch(e){}if(!r.ok){const er=new Error((j&&(j.error||j.message||j.msg))||'خطأ '+r.status);er.status=r.status;throw er}return j}
 const orvexQ=()=>window.orvexSyncQ||null;/* syncq.js (اختياري: غيابه يعيد السلوك القديم) */
 const fn=b=>rq('/functions/v1/orvex-admin',{method:'POST',body:JSON.stringify(b)});
 async function all(p){let out=[],o=0;for(;;){const r=await rq(p+(p.includes('?')?'&':'?')+'limit=1000&offset='+o);out=out.concat(r);if(r.length<1000)return out;o+=1000}}
@@ -45,11 +77,11 @@ async function pull(first){const sid=SB.shop;if(!sid)return;SB.busy=true;try{
  if(sh.license_active===false&&SB.prof.role!=='founder')throw new Error('ترخيص المحل موقوف. تواصل مع المؤسس');
  const nd=normalize(fresh());nd.settings=Object.assign(nd.settings,{name:sh.name},sh.settings||{});if(sh.features&&Object.keys(sh.features).length)nd.features=sh.features;nd.edition=SB.prof.role==='founder'?'studio':'manager';
  let cur='';const mx=r=>r.forEach(x=>{if(x.updated_at>cur)cur=x.updated_at});
- for(const t of MAIN){const rr=await all(`/rest/v1/${t}?shop_id=eq.${sid}&select=data,updated_at`);mx(rr);nd[t]=rr.map(x=>x.data)}
- const rec=await all(`/rest/v1/records?shop_id=eq.${sid}&select=kind,data,updated_at`);mx(rec);REC.forEach(k=>nd[k]=rec.filter(x=>x.kind===k).map(x=>x.data));
+ for(const t of MAIN){const rr=await all(`/rest/v1/${t}?shop_id=eq.${sid}&select=data,updated_at`);mx(rr);nd[t]=rr.map(x=>x.data).filter(x=>x&&typeof x==='object')}
+ const rec=await all(`/rest/v1/records?shop_id=eq.${sid}&select=kind,data,updated_at`);mx(rec);REC.forEach(k=>nd[k]=rec.filter(x=>x.kind===k).map(x=>x.data).filter(x=>x&&typeof x==='object'));
  nd.users=(await rq(`/rest/v1/profiles?shop_id=eq.${sid}&select=*`)).map(toUser);if(!nd.users.some(u=>u.id===SB.me.id))nd.users.push(SB.me);
  if(!first&&SB.dirty)return false;if(cur)SB.cur=cur;if(!first&&sig(nd)===sig(db))return false;
- db=nd;last={};COLL.forEach(k=>{last[k]=Object.fromEntries(db[k].filter(r=>r.id).map(r=>[r.id,JSON.stringify(r)]))});last._s=JSON.stringify(db.settings);persistBase();return true}finally{SB.busy=false;if(SB.again){SB.again=false;clearTimeout(SB.pt);SB.pt=setTimeout(()=>{if(SB.dirty&&SB.sess&&SB.shop)push()},300)}}}
+ db=nd;last={};COLL.forEach(k=>{last[k]=Object.fromEntries(db[k].filter(r=>r&&r.id).map(r=>[r.id,JSON.stringify(r)]))});last._s=JSON.stringify(db.settings);persistBase();return true}finally{SB.busy=false;if(SB.again){SB.again=false;clearTimeout(SB.pt);SB.pt=setTimeout(()=>{if(SB.dirty&&SB.sess&&SB.shop)push()},300)}}}
 const cj=v=>JSON.stringify(v,(k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.keys(x).sort().reduce((o,q)=>(o[q]=x[q],o),{}):x);
 /* مزامنة تزايدية: تجلب فقط الصفوف التي تغيّرت منذ آخر سحب (updated_at بتوقيت الخادم). الحذف يُلتقط بالسحب الكامل كل 10 دورات */
 async function pullInc(){const sid=SB.shop;if(!sid)return false;SB.busy=true;try{
@@ -145,6 +177,7 @@ const _sv=save;save=function(){_sv();if(SB.prof&&SB.prof.role==='founder'&&!SB.s
 /* عند عودة الإنترنت، لا ننتظر دورة المزامنة الدورية */
 window.addEventListener('online',()=>{if(SB.shop&&SB.sess&&SB.dirty&&!SB.authExpired){clearTimeout(SB.pt);clearTimeout(SB.retryTimer);SB.retryCount=0;SB.pt=setTimeout(()=>push(),400)}});
 window.addEventListener('beforeunload',e=>{if(SB.dirty){e.preventDefault();e.returnValue=''}});
+
 window.__orvexSync={get COLL(){return COLL},ifKey:IFK,inflightAdd,recoverLocal,loadBase,persistBase,refill,poolLoad,get SB(){return SB},get last(){return last},set last(v){last=v},push,pullInc,pull,pullFounderCatalog,pushFounderCatalog,get FC(){return FC}};/* لاختبارات tests/run.js */
 window.__orvexRequest=(p,o)=>rq(p,o);
 const NF={inv:'next',po:'nextPo',rt:'nextRt'},POOLK=()=>KEY+'_pool_'+SB.shop;
@@ -192,9 +225,9 @@ window.devOk=async id=>{try{await rq('/rest/v1/devices?id=eq.'+id,{method:'PATCH
 window.devDel=async id=>{try{await rq('/rest/v1/devices?id=eq.'+id,{method:'DELETE'});loadDevs();loadPend()}catch(e){toast(e.message)}};
 /* --- لوحة المؤسس --- */
 vStudio=function(){if(!isDesigner())return '';if(state.shopId){closeShop();return ''}setTimeout(loadShops,30);setTimeout(loadPend,60);setTimeout(loadDevReq,70);return `<div class="note">لوحة المؤسس: أنشئ محلاً وحساب مدير له، وتحكّم بالمميزات والترخيص، وافتح بياناته مباشرة.</div><div class="card" id="pendList" style="display:none"></div><div class="card" id="reqList" style="display:none"></div><div class="actions" style="margin:0 0 10px"><button class="btn" onclick="auditView()">📜 سجل التغييرات (كل المحلات)</button></div><div class="card" id="shopList"><p class="muted">جارٍ التحميل…</p></div><button class="fab" onclick="newShopForm()">+ محل جديد</button>`};
-async function loadShops(){const b=$('#shopList');if(!b)return;try{const S=await rq('/rest/v1/shops?select=*&order=created_at'),P=await rq('/rest/v1/profiles?role=eq.manager&select=*');SB.shops=S;
+async function loadShops(){const b=$('#shopList');if(!b||!founderOK())return;try{const S=await rq('/rest/v1/shops?select=*&order=created_at'),P=await rq('/rest/v1/profiles?role=eq.manager&select=*');SB.shops=S;
  b.innerHTML=S.length?S.map(s=>{const m=P.find(x=>x.shop_id===s.id);return `<button class="row tap" onclick="shopMenu('${jsq(s.id)}')"><div class="grow"><div class="t">${esc(s.name)}</div><small>المدير: ${m?esc(m.full_name)+' (@'+esc(m.username)+')':'-'}</small></div><span class="badge ${s.license_active?'':'grey'}">${s.license_active?'فعّال':'موقوف'}</span></button>`}).join(''):empty('لا توجد محلات بعد.')}catch(e){b.innerHTML='<p class="muted">'+esc(e.message)+'</p>'}}
-async function loadPend(){const b=$('#pendList');if(!b)return;try{const D=await rq('/rest/v1/devices?approved=eq.false&select=*&order=created_at'),P=D.length?await rq('/rest/v1/profiles?id=in.('+[...new Set(D.map(d=>d.profile_id))].join(',')+')&select=id,full_name,username,shop_id'):[],S=SB.shops||await rq('/rest/v1/shops?select=id,name');
+async function loadPend(){const b=$('#pendList');if(!b||!founderOK())return;try{const D=await rq('/rest/v1/devices?approved=eq.false&select=*&order=created_at'),P=D.length?await rq('/rest/v1/profiles?id=in.('+[...new Set(D.map(d=>d.profile_id))].join(',')+')&select=id,full_name,username,shop_id'):[],S=SB.shops||await rq('/rest/v1/shops?select=id,name');
  b.style.display=D.length?'block':'none';b.innerHTML='<h3>طلبات تفعيل الأجهزة</h3>'+D.map(d=>{const u=P.find(x=>x.id===d.profile_id)||{},sh=S.find(x=>x.id===u.shop_id);return `<div class="row"><div class="grow"><div class="t">${esc(u.full_name||'?')} <small>@${esc(u.username||'')}</small></div><small>${esc(sh?sh.name:'')} - جهاز ${esc(d.device_id.slice(0,8))}</small></div><button class="btn primary" onclick="devOk('${jsq(d.id)}')">تفعيل</button><button class="btn danger" onclick="devDel('${jsq(d.id)}')">رفض</button></div>`}).join('')}catch(e){}}
 window.newShopForm=function(){modal('محل جديد',`<label>اسم المحل</label><input id="n_s"><label>اسم المدير</label><input id="n_n"><div class="f2"><div><label>اسم المستخدم</label><input id="n_u" autocapitalize="off"></div><div><label>كلمة المرور (6+)</label><input id="n_p" type="password"></div></div><label>البريد الإلكتروني للمدير</label><input id="n_e" type="email" autocomplete="off" autocapitalize="off"><label>هاتف المدير</label><input id="n_h" type="tel"><div class="actions"><button class="btn primary" onclick="makeShop()">إنشاء</button></div>`)};
 window.makeShop=async function(){try{await fn({action:'create_shop',name:$('#n_s').value,full_name:$('#n_n').value,username:$('#n_u').value,password:$('#n_p').value,phone:$('#n_h').value,email:$('#n_e').value});closeModal();toast('تم إنشاء المحل وحساب المدير');loadShops()}catch(e){toast(e.message)}};
@@ -210,6 +243,7 @@ const audFeat=(o,n)=>{let a={},b={};try{a=JSON.parse(o||'{}')||{};b=JSON.parse(n
 const audTime=t=>{try{return new Date(t).toLocaleString('en-GB',{hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}catch(e){return t}};
 window.auditView=async function(shopId,flt){
  shopId=shopId||'';flt=flt||'all';
+ if(!founderOK()){if(!SB.shop)return toast('هذه الوظيفة للمؤسس فقط');shopId=SB.shop}
  modal(shopId?'سجل تغييرات المحل':'سجل التغييرات','<p class="muted">جارٍ التحميل…</p>');
  try{
   const R=await rq('/rest/v1/shop_audit?select=*&order=created_at.desc&limit=200'+(shopId?'&shop_id=eq.'+shopId:'')+(flt==='blocked'?'&blocked=eq.true':'')),
@@ -256,7 +290,7 @@ window.dlMgrCopy=async function(id){const s=(SB.shops||[]).find(x=>x.id===id);if
   toast('تم تجهيز نسخة المدير')}catch(e){toast('تعذّر تجهيز النسخة')}};
 window.updInfo=function(id){const s=(SB.shops||[]).find(x=>x.id===id);if(!s)return;modal('كود التحديث',`<p class="muted" style="margin-top:0">لا حاجة لكود: أي تعديل تحفظه (المميزات، الترخيص، الملاحظة) يصل المدير تلقائيًا عند فتح البرنامج.</p><div class="actions"><button class="btn" onclick="siteSend(window.appLink(),'برنامج المحل')">رابط البرنامج</button><button class="btn" onclick="shopLink('${jsq(id)}')">رابط المتجر</button></div>`)};
 window.mgrDevices=function(id,code){modal('تفعيل جهاز',`<p class="muted" style="margin-top:0">رقم الجهاز يصلك تلقائياً من نسخة المدير، أو الصقه يدوياً. الكود يعمل على ذلك الجهاز فقط.</p><input id="dv_id" autocapitalize="characters" value="${esc(code||'')}"><div class="actions"><button class="btn primary" onclick="makeDevCodeS('${jsq(id)}')">إنشاء الكود</button></div><div id="dv_out"></div>`);if(code)setTimeout(()=>makeDevCodeS(id),0)};
-window.loadDevReq=async function(){const b=$('#reqList');if(!b)return;try{const R=await rq('/rest/v1/device_requests?select=*&order=created_at.desc'),S=SB.shops||await rq('/rest/v1/shops?select=id,name');b.style.display=R.length?'block':'none';b.innerHTML='<h3>طلبات تفعيل نسخة المدير</h3>'+R.map(r=>{const sh=S.find(x=>x.id===r.shop_id);return `<div class="row"><div class="grow"><div class="t">${esc(sh?sh.name:'?')}</div><small>رقم الجهاز: ${esc(r.device_code)}</small></div><button class="btn primary" onclick="mgrDevices('${jsq(r.shop_id)}','${jsq(r.device_code)}')">إنشاء الكود</button><button class="btn danger" onclick="devReqDel('${jsq(r.id)}')">حذف</button></div>`}).join('')}catch(e){}};
+window.loadDevReq=async function(){const b=$('#reqList');if(!b||!founderOK())return;try{const R=await rq('/rest/v1/device_requests?select=*&order=created_at.desc'),S=SB.shops||await rq('/rest/v1/shops?select=id,name');b.style.display=R.length?'block':'none';b.innerHTML='<h3>طلبات تفعيل نسخة المدير</h3>'+R.map(r=>{const sh=S.find(x=>x.id===r.shop_id);return `<div class="row"><div class="grow"><div class="t">${esc(sh?sh.name:'?')}</div><small>رقم الجهاز: ${esc(r.device_code)}</small></div><button class="btn primary" onclick="mgrDevices('${jsq(r.shop_id)}','${jsq(r.device_code)}')">إنشاء الكود</button><button class="btn danger" onclick="devReqDel('${jsq(r.id)}')">حذف</button></div>`}).join('')}catch(e){}};
 window.devReqDel=async id=>{try{await rq('/rest/v1/device_requests?id=eq.'+id,{method:'DELETE'});loadDevReq()}catch(e){toast(e.message)}};
 window.makeDevCodeS=async function(id){const d=($('#dv_id').value||'').trim().toUpperCase();if(!id||d.length<6)return toast('أدخل رقم الجهاز');$('#dv_out').innerHTML='<p class="muted">جارٍ إنشاء كود التفعيل على الخادم…</p>';try{const r=await fn({action:'pkg_code',shop_id:id,device_code:d});if(!r||!r.code)throw new Error((r&&r.error)||'تعذّر إنشاء الكود');$('#dv_out').innerHTML=`<label>كود التفعيل</label><input readonly value="${esc(r.code)}" onclick="this.select()">`}catch(e){$('#dv_out').innerHTML=`<p class="muted">${esc(e.message||'تعذّر إنشاء الكود')}</p>`}};
 window.appLink=function(){return location.href.split('#')[0].split('?')[0]};
@@ -322,7 +356,7 @@ const _sa4=showAuth;showAuth=function(){_sa4();rkUI()};
 /* --- مساعدو المصمم: حسابات بكل صلاحيات المصمم --- */
 const isMainF=()=>!!(SB.me&&SB.me.designer&&!(SB.me.perms&&SB.me.perms._assist));
 const _vs=vStudio;vStudio=function(){const h=_vs();if(typeof h==='string'&&h.includes('id="shopList"')){setTimeout(loadAssts,90);return h.replace('<button class="fab"','<div class="card" id="asstBox"></div><button class="fab"')}return h};
-async function loadAssts(){const b=$('#asstBox');if(!b)return;try{const P=(await rq('/rest/v1/profiles?role=eq.founder&select=*&order=created_at')).filter(p=>p.perms&&p.perms._assist);
+async function loadAssts(){const b=$('#asstBox');if(!b||!founderOK())return;try{const P=(await rq('/rest/v1/profiles?role=eq.founder&select=*&order=created_at')).filter(p=>p.perms&&p.perms._assist);
  b.innerHTML='<h3>مساعدو المصمم</h3><p class="muted" style="margin-top:0;font-size:13px">حساب يملك كل صلاحيات المصمم: المحلات والمميزات والترخيص والأجهزة.</p>'+(P.length?P.map(p=>`<div class="row"><div class="grow"><div class="t">${esc(p.full_name)}</div><small>@${esc(p.username)}</small></div>${isMainF()?`<button class="btn" onclick="asstPw('${jsq(p.id)}')">كلمة المرور</button><button class="btn danger" onclick="asstDel('${jsq(p.id)}')">حذف</button>`:''}</div>`).join(''):'<p class="muted">لا يوجد مساعد بعد.</p>')+(isMainF()?'<div class="actions"><button class="btn primary" onclick="asstForm()">+ إضافة مساعد</button></div>':'')}catch(e){b.innerHTML='<h3>مساعدو المصمم</h3><p class="muted">'+esc(e.message)+'</p>'}}
 window.asstForm=function(){modal('مساعد جديد',`<label>اسم المساعد</label><input id="as_n"><div class="f2"><div><label>اسم المستخدم</label><input id="as_u" autocapitalize="off"></div><div><label>كلمة المرور (6+)</label><input id="as_p" type="password" autocomplete="new-password"></div></div><p class="muted" style="font-size:13px">سيحصل على كل صلاحيات المصمم.</p><div class="actions"><button class="btn primary" onclick="asstSave()">إنشاء</button></div>`)};
 window.asstSave=async function(){const n=($('#as_n').value||'').trim(),u=($('#as_u').value||'').trim().toLowerCase(),p=$('#as_p').value;if(!n||!u)return toast('أدخل الاسم واسم المستخدم');if(p.length<6)return toast('كلمة المرور 6 أحرف على الأقل');
@@ -487,4 +521,8 @@ const _r2=render;render=function(){_r2.apply(this,arguments);try{enhance()}catch
 })();
 async function boot(){try{await initData()}catch(e){console.error(e)}showAuth()}
 const VIEWS={home:vHome,pos:()=>'',stock:vStock,parties:vParties,more:vMore,invoices:vInvoices,purchases:vPurchases,expenses:vExpenses,reports:vReports,settings:vSettings,returns:vReturns,users:vUsers,studio:vStudio,closings:vClosings,site:()=>window.vSite()};
+/* حراسة على مستوى الدوال: تُرفض الاستدعاءات من أي حساب غير المؤسس */
+['newShopForm','makeShop','shopMenu','saveShopF','delShop','openShop','closeShop','devReqDel','makeDevCodeS','mgrDevices','devOk','devDel','asstForm','asstSave','asstPw','asstPwSave','asstDel','shopForm','saveShop','enterAsManager','downloadPkg','updateCodeModal','makeUpdateCode','makeDevCode'].forEach(n=>{
+ const f=window[n];if(typeof f!=='function'||f.__founderOnly)return;
+ const g=function(){if(!window.orvexRole.ok()){toast('هذه الوظيفة للمؤسس فقط');return}return f.apply(this,arguments)};g.__founderOnly=true;window[n]=g});
 boot();

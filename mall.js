@@ -10,11 +10,12 @@ const rq=(p,o)=>window.__orvexRequest(p,o);
 const rpc=(n,a)=>rq('/rest/v1/rpc/'+n,{method:'POST',body:JSON.stringify(a||{})});
 const fn=b=>rq('/functions/v1/orvex-mall-admin',{method:'POST',body:JSON.stringify(b)});
 const UN=/^[a-z0-9_.-]{3,30}$/;
+const FOUNDER=()=>!!(window.orvexRole&&window.orvexRole.founder());
 let MALLS=[],SHOPS=[];
 
 /* ---------------- واجهة المؤسس ---------------- */
 async function loadMalls(){
-  const b=$('#mallBox');if(!b)return;
+  const b=$('#mallBox');if(!b||!FOUNDER())return;
   try{
     MALLS=await rpc('mall_admin_list');
     b.innerHTML='<h3>مدراء المجمعات التجارية</h3><p class="muted" style="margin-top:0;font-size:13px">حساب للقراءة فقط يطّلع على مبيعات المحلات التي تحددها له.</p>'
@@ -266,4 +267,9 @@ window.orvexMall={enter,logout,refresh:()=>load(),
   setMode(m){V.mode=m;showShop()},
   setDM(){V.dm=$('#sd_y').value+'-'+$('#sd_m').value;load()},
   setDY(){V.dy=$('#sd_y').value;load()}};
+
+/* حراسة: إدارة المجمعات للمؤسس فقط (التحقق الفعلي في الخادم؛ هذه طبقة إضافية) */
+['mallForm','mallCreate','mallMenu','mallSave','mallDel','mallShops','mallToggle','mallAudit'].forEach(n=>{
+  const f=window[n];if(typeof f!=='function')return;
+  window[n]=function(){if(!FOUNDER()){toast('هذه الوظيفة للمؤسس فقط');return}return f.apply(this,arguments)}});
 })();
