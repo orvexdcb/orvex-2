@@ -21,11 +21,18 @@
     return '';
   };
   function fixRow(k,r){
-    if(k==='products'){r.name=S(r.name,'');r.stock=N(r.stock);r.min=N(r.min);r.price=N(r.price);r.cost=N(r.cost)}
-    else if(k==='customers'||k==='suppliers'){r.name=S(r.name,'');r.balance=N(r.balance)}
-    else if(k==='sales'){r.date=D(r.date||r.createdAt||r.ts);r.no=S(r.no,'');r.total=N(r.total);r.net=r.net==null?N(r.total):N(r.net);r.paid=N(r.paid);r.cost=N(r.cost);if(!Array.isArray(r.items))r.items=[]}
-    else if(k==='returns'){r.date=D(r.date);r.net=N(r.net);r.cost=N(r.cost)}
-    else if(k==='expenses'||k==='payments'){r.date=D(r.date);r.amount=N(r.amount)}
+    var changed=false;
+    function set(key,value){if(r[key]!==value){r[key]=value;changed=true}}
+    if(k==='products'){set('name',S(r.name,''));set('stock',N(r.stock));set('min',N(r.min));set('price',N(r.price));set('cost',N(r.cost))}
+    else if(k==='customers'||k==='suppliers'){set('name',S(r.name,''));set('balance',N(r.balance))}
+    else if(k==='sales'){
+      set('date',D(r.date||r.createdAt||r.ts));set('no',S(r.no,''));set('total',N(r.total));
+      set('net',r.net==null?N(r.total):N(r.net));set('paid',N(r.paid));set('cost',N(r.cost));
+      if(!Array.isArray(r.items))set('items',[]);
+    }
+    else if(k==='returns'){set('date',D(r.date));set('net',N(r.net));set('cost',N(r.cost))}
+    else if(k==='expenses'||k==='payments'){set('date',D(r.date));set('amount',N(r.amount))}
+    return changed;
   }
   window.orvexSanitizeDb=function(){
     if(typeof db==='undefined'||!db)return;
@@ -34,8 +41,7 @@
       if(!Array.isArray(db[k])){db[k]=[];return}
       if(db[k].some(function(r){return !r||typeof r!=='object'}))db[k]=db[k].filter(function(r){return r&&typeof r==='object'});
       db[k].forEach(function(r){
-        var before=JSON.stringify(r);fixRow(k,r);
-        if(before!==JSON.stringify(r)&&r.id&&typeof last!=='undefined'&&last&&last[k])last[k][r.id]=JSON.stringify(r);
+        if(fixRow(k,r)&&r.id&&typeof last!=='undefined'&&last&&last[k])last[k][r.id]=JSON.stringify(r);
       });
     });
     if(!db.settings||typeof db.settings!=='object')db.settings=normalize(fresh()).settings;
