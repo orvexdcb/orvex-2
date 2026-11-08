@@ -71,7 +71,8 @@ function paintBadge(){
   let c=b.querySelector('.od-cnt');const n=isFounder()?N.items.length:0;
   if(!n){if(c)c.remove();return}
   if(!c){c=document.createElement('b');c.className='od-cnt';b.appendChild(c)}
-  c.textContent=n>9?'9+':String(n);b.setAttribute('aria-label','التنبيهات ('+n+' غير مقروء)');
+  const tx=n>9?'9+':String(n);if(c.textContent!==tx)c.textContent=tx;/* لا نكتب إلا عند التغيّر: المراقب يعيد استدعاء هذه الدالة */
+  const al='التنبيهات ('+n+' غير مقروء)';if(b.getAttribute('aria-label')!==al)b.setAttribute('aria-label',al);
  });
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshUnread()});

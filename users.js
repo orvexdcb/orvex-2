@@ -39,8 +39,8 @@ function showAuth(){
      <label>اسم الاستوديو</label><input id="a_store" value="${esc(db.settings.name)}"><label>اسم المصمم</label><input id="a_name"><label>البريد الإلكتروني</label><input id="a_email" type="email" autocomplete="email" autocapitalize="off" value=""><label>اسم المستخدم (بالإنجليزية بدون مسافات)</label><input id="a_user" autocapitalize="off" autocomplete="username"><label>كلمة المرور</label><input id="a_pass" type="password" autocomplete="new-password"><label>تأكيد كلمة المرور</label><input id="a_pass2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSetup()">
      <div class="actions"><button class="btn primary" onclick="doSetup()">إنشاء حساب المصمم والدخول</button></div></div>`
    :`<div class="auth-card">${orvexLogo('a')}<h1>ORVEX</h1><p class="muted" style="margin:-6px 0 6px;font-weight:600">${esc(db.settings.name)}</p><p class="muted" style="margin-top:0">تسجيل الدخول</p>
-     <label>اسم المستخدم</label><input id="a_user" autocapitalize="off" autocomplete="username" value="${esc(last)}"><label>كلمة المرور</label><input id="a_pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();(window.sbLogin?sbLogin():doLogin())}">
-     <div class="actions"><button id="a_btn" class="btn primary" onclick="(window.sbLogin?sbLogin():doLogin())">دخول</button></div>${db.license?`<p style="text-align:center;margin:14px 0 0"><a href="#" class="muted" onclick="updModal();return false">لديك كود تحديث من المصمم؟</a></p>`:''}</div>`;
+     <label>اسم المستخدم</label><input id="a_user" autocapitalize="off" autocomplete="username" value="${esc(last)}"><label>كلمة المرور</label><input id="a_pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+     <div class="actions"><button class="btn primary" onclick="doLogin()">دخول</button></div>${db.license?`<p style="text-align:center;margin:14px 0 0"><a href="#" class="muted" onclick="updModal();return false">لديك كود تحديث من المصمم؟</a></p>`:''}</div>`;
   document.body.appendChild(d);
 }
 async function doSetup(){
