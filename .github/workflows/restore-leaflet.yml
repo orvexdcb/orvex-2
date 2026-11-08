@@ -1,0 +1,38 @@
+name: Restore Leaflet assets
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/restore-leaflet.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore Leaflet 1.9.4 assets
+        run: |
+          set -euo pipefail
+          mkdir -p vendor/leaflet/images
+          curl -fsSL https://unpkg.com/leaflet@1.9.4/dist/leaflet.js -o vendor/leaflet/leaflet.js
+          curl -fsSL https://unpkg.com/leaflet@1.9.4/dist/leaflet.css -o vendor/leaflet/leaflet.css
+          curl -fsSL https://unpkg.com/leaflet@1.9.4/dist/images/layers.png -o vendor/leaflet/images/layers.png
+          curl -fsSL https://unpkg.com/leaflet@1.9.4/dist/images/layers-2x.png -o vendor/leaflet/images/layers-2x.png
+          curl -fsSL https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png -o vendor/leaflet/images/marker-icon.png
+          curl -fsSL https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png -o vendor/leaflet/images/marker-icon-2x.png
+          curl -fsSL https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png -o vendor/leaflet/images/marker-shadow.png
+          curl -fsSL https://raw.githubusercontent.com/Leaflet/Leaflet/v1.9.4/LICENSE -o vendor/leaflet/LICENSE-LEAFLET.txt
+          test -s vendor/leaflet/leaflet.js
+          test -s vendor/leaflet/leaflet.css
+          grep -q 'leaflet' vendor/leaflet/leaflet.js
+      - name: Commit restored assets and remove temporary workflow
+        run: |
+          set -euo pipefail
+          rm .github/workflows/restore-leaflet.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vendor/leaflet .github/workflows/restore-leaflet.yml
+          git commit -m "Restore local Leaflet assets for ORVEX maps"
+          git push
