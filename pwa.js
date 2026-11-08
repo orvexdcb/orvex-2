@@ -42,6 +42,36 @@
     }
   }catch(e){}
 
+
+  /* 4) زر تحديث يدوي دائم بعد تسجيل الدخول، لجميع الأدوار والأجهزة */
+  function addManualUpdate(){
+    var s=typeof window.__orvexStatus==='function'?window.__orvexStatus():null;
+    var logged=!!(s&&s.logged);
+    var b=document.getElementById('orvexManualUpdate');
+    if(!logged){if(b)b.remove();return}
+    if(b)return;
+    b=document.createElement('button');b.id='orvexManualUpdate';b.type='button';
+    b.textContent='↻ تحديث البرنامج';
+    b.setAttribute('aria-label','تحديث برنامج ORVEX');
+    b.style.cssText='position:fixed;top:calc(env(safe-area-inset-top,0px) + 58px);inset-inline-end:10px;z-index:8999;border:1px solid #087a43;border-radius:999px;background:#087a43;color:#fff;padding:8px 13px;font:600 12px/1.2 "IBM Plex Sans Arabic",sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.18);cursor:pointer';
+    b.addEventListener('click',async function(){
+      var st=typeof window.__orvexStatus==='function'?window.__orvexStatus():null;
+      if(st&&(st.busy||st.dirty)){try{toast('توجد عملية حفظ أو مزامنة جارية. انتظر اكتمالها ثم حدّث البرنامج.')}catch(e){alert('توجد عملية حفظ أو مزامنة جارية. انتظر اكتمالها ثم حدّث البرنامج.')}return}
+      if(!confirm('سيتم إعادة تحميل ORVEX. تأكد من إكمال أي فاتورة أو تعديل مفتوح. هل تريد المتابعة؟'))return;
+      b.disabled=true;b.textContent='جارٍ التحديث…';
+      try{
+        if('serviceWorker' in navigator){
+          var reg=await navigator.serviceWorker.getRegistration();
+          if(reg)await reg.update().catch(function(){});
+        }
+      }catch(e){}
+      location.reload();
+    });
+    document.body.appendChild(b);
+  }
+  function updateManualButton(){try{addManualUpdate()}catch(e){}}
+  window.addEventListener('load',function(){updateManualButton();setInterval(updateManualButton,1500)});
+
   /* 3) مؤشر حالة المزامنة (للقراءة فقط؛ يظهر بعد تسجيل الدخول للخادم) */
   var pill=null;
   function mk(){
