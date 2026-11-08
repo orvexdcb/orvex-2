@@ -54,6 +54,8 @@ async function doSetup(){
   db.users.push(u);db.settings.name=store;db.edition='studio';save();loginAs(u);
 }
 async function doLogin(){
+  /* الحسابات السحابية يجب أن تمر عبر Supabase؛ لا تستخدم جلسة الدخول المحلية القديمة */
+  if(typeof window.sbLogin==='function')return window.sbLogin();
   const un=$('#a_user').value.trim().toLowerCase(),pw=$('#a_pass').value;
   const u=db.users.find(x=>x.username===un);
   if(!u||u.active===false||!(await pwCheck(pw,u)))return toast(u&&u.active===false?'هذا الحساب موقوف':'اسم المستخدم أو كلمة المرور غير صحيحة');
