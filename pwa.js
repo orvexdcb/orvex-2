@@ -59,6 +59,8 @@
       if(st&&(st.busy||st.dirty)){try{toast('توجد عملية حفظ أو مزامنة جارية. انتظر اكتمالها ثم حدّث البرنامج.')}catch(e){alert('توجد عملية حفظ أو مزامنة جارية. انتظر اكتمالها ثم حدّث البرنامج.')}return}
       if(!confirm('سيتم إعادة تحميل ORVEX. تأكد من إكمال أي فاتورة أو تعديل مفتوح. هل تريد المتابعة؟'))return;
       b.disabled=true;b.textContent='جارٍ التحديث…';
+      /* احفظ رمز الجلسة الحالي قبل إعادة تحميل التطبيق؛ لا تحفظ كلمة المرور ولا بيانات المتجر هنا. */
+      try{if(typeof window.__orvexPrepareUpdate==='function')window.__orvexPrepareUpdate()}catch(e){}
       try{
         if('serviceWorker' in navigator){
           var reg=await navigator.serviceWorker.getRegistration();
