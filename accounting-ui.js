@@ -63,7 +63,7 @@
 
   async function founderOpen(){
     root.modal('المحاسبة',`<div class="actions no-print" style="flex-wrap:wrap;margin-bottom:8px">${[['tb','ميزان المراجعة'],['is','قائمة الدخل'],['bs','الميزانية'],['je','قيد يدوي'],['ac','الحسابات'],['pr','الفترات']].map(([k,l])=>`<button class="btn" onclick="acFounderTab('${k}')">${l}</button>`).join('')}</div>
-      <div class="actions no-print" style="margin-bottom:8px"><button class="btn primary" onclick="acFounderTab('dash')">📊 لوحة المحلات</button><button class="btn" onclick="acFounderTab('shops')">🏬 حسابات المحلات</button></div>
+      <div class="actions no-print" style="margin-bottom:8px"><button class="btn primary" onclick="acFounderTab('dash')">📊 لوحة المحلات</button></div>
       <div id="acBody"><p class="muted">جارٍ التحميل…</p></div>`);
     await acFounderTab('tb');
   }
