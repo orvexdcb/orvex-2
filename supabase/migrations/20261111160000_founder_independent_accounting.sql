@@ -117,3 +117,18 @@ revoke all on function public.acct_founder_post(jsonb) from public,anon;
 revoke all on function public.acct_founder_lock(date) from public,anon;
 revoke all on function public.acct_founder_group_dashboard() from public,anon;
 grant execute on function public.acct_founder_seed(),public.acct_founder_add_account(text,text,text),public.acct_founder_trial_balance(date,date),public.acct_founder_post(jsonb),public.acct_founder_lock(date),public.acct_founder_group_dashboard() to authenticated;
+
+-- Founder-only, read-only view of each shop's chart of accounts.
+create or replace function public.acct_founder_shop_accounts()
+returns table(shop_id uuid,shop_name text,account_id uuid,code text,account_name text,account_type text,is_active boolean)
+language plpgsql security definer set search_path='' as $$
+begin
+ if auth.uid() is null or private.my_role() is distinct from 'founder' or not private.my_device_ok() then
+  raise exception 'ORVEX_FORBIDDEN';
+ end if;
+ return query select s.id,s.name,a.id,a.code,a.name,a.type,a.is_active
+ from public.shops s join public.acct_accounts a on a.shop_id=s.id
+ order by s.name,a.code;
+end $$;
+revoke all on function public.acct_founder_shop_accounts() from public,anon;
+grant execute on function public.acct_founder_shop_accounts() to authenticated;
