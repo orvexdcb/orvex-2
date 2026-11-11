@@ -62,18 +62,41 @@
   async function tbRows(from,to){const b=B();return b.rpc('trial_balance',{p_shop:b.shop(),p_from:from,p_to:to})}
 
   async function founderOpen(){
-    root.modal('محاسبة المؤسس',`<div class="actions no-print" style="flex-wrap:wrap;margin-bottom:8px">
-      <button class="btn primary" onclick="acFounderTab('dash')">لوحة المحلات</button>
-      <button class="btn" onclick="acFounderTab('tb')">محاسبتي المستقلة</button>
-      <button class="btn" onclick="acFounderTab('ac')">دليل حساباتي</button>
-      <button class="btn" onclick="acFounderTab('je')">قيد للمؤسس</button>
-    </div><div id="acBody"><p class="muted">جارٍ التحميل…</p></div>`);
-    await acFounderTab('dash');
+    root.modal('المحاسبة',`<div class="actions no-print" style="flex-wrap:wrap;margin-bottom:8px">${[['tb','ميزان المراجعة'],['is','قائمة الدخل'],['bs','الميزانية'],['je','قيد يدوي'],['ac','الحسابات'],['pr','الفترات']].map(([k,l])=>`<button class="btn" onclick="acFounderTab('${k}')">${l}</button>`).join('')}</div>
+      <div class="actions no-print" style="margin-bottom:8px"><button class="btn primary" onclick="acFounderTab('dash')">📊 لوحة المحلات</button><button class="btn" onclick="acFounderTab('shops')">🏬 حسابات المحلات</button></div>
+      <div id="acBody"><p class="muted">جارٍ التحميل…</p></div>`);
+    await acFounderTab('tb');
   }
   root.acFounderTab=async function(t){
     const b=B(),el=document.getElementById('acBody');if(!el)return;
     el.innerHTML='<p class="muted">جارٍ التحميل…</p>';
     try{
+      if(t==='shops'){
+        const accounts=await b.rpc('acct_founder_shop_accounts',{});
+        const groups={};accounts.forEach(a=>(groups[a.shop_id]??={name:a.shop_name,rows:[]}).rows.push(a));
+        const cards=Object.values(groups).map(g=>'<section class="card" style="margin:10px 0"><h3>'+E(g.name)+'</h3>'+tbl([['الرمز'],['الحساب'],['النوع'],['الحالة']],g.rows.map(a=>'<tr>'+td(E(a.code))+td(E(a.account_name))+td(TYPES[a.account_type]||E(a.account_type))+td(a.is_active?'نشط':'موقوف')+'</tr>'))+'</section>');
+        el.innerHTML='<h3>🏬 دليل حسابات المحلات</h3><p class="muted">عرض فقط. حسابات كل محل تبقى مستقلة ولا يمكن تعديلها من حساب المؤسس.</p>'+(cards.length?cards.join(''):'<p class="muted">لا توجد حسابات محاسبية للمحلات بعد.</p>');
+        return;
+      }
+      if(t==='is'||t==='bs'){
+        await b.rpc('acct_founder_seed',{});
+        const rows=await b.rpc('acct_founder_trial_balance',{p_from:'1900-01-01',p_to:tdy()});
+        if(t==='is'){
+          const r=incomeStatement(rows);
+          el.innerHTML='<h3>قائمة دخل المؤسس</h3>'+tbl([['البند'],['المبلغ',1]],r.rev.map(x=>'<tr>'+td(E(x.name))+td(M(x.amount),1)+'</tr>').concat(['<tr><td><b>إجمالي الإيرادات</b></td>'+td('<b>'+M(r.revenue)+'</b>',1)+'</tr>'],r.exp.map(x=>'<tr>'+td(E(x.name))+td(M(x.amount),1)+'</tr>'),['<tr><td><b>إجمالي المصروفات</b></td>'+td('<b>'+M(r.expense)+'</b>',1)+'</tr>','<tr><td><b>صافي الربح</b></td>'+td('<b>'+M(r.net)+'</b>',1)+'</tr>']));
+        }else{
+          const r=balanceSheet(rows);
+          const section=(name,arr)=>'<tr><td colspan="2"><b>'+name+'</b></td></tr>'+arr.map(x=>'<tr>'+td(E(x.name))+td(M(x.amount),1)+'</tr>').join('');
+          el.innerHTML='<h3>ميزانية المؤسس</h3>'+tbl([['البند'],['المبلغ',1]],[section('الأصول',r.assets),'<tr><td><b>إجمالي الأصول</b></td>'+td(M(r.assetsTotal),1)+'</tr>',section('الالتزامات',r.liab),'<tr><td><b>إجمالي الالتزامات</b></td>'+td(M(r.liabTotal),1)+'</tr>',section('حقوق الملكية',r.eq),'<tr><td>أرباح الفترات</td>'+td(M(r.earnings),1)+'</tr>','<tr><td><b>إجمالي حقوق الملكية</b></td>'+td(M(r.equityWithEarnings),1)+'</tr>'].join(''))+'<p>'+(r.balanced?'✓ الميزانية متوازنة':'الميزانية تحتاج مراجعة')+'</p>';
+        }
+        return;
+      }
+      if(t==='pr'){
+        const periods=await b.get('acct_founder_periods?select=locked_until,updated_at');
+        const locked=periods[0]?.locked_until||'لا توجد فترة مقفلة';
+        el.innerHTML='<h3>فترات المؤسس</h3><div class="card">'+E(locked)+'</div><label>إقفال حتى تاريخ</label><input type="date" id="fPeriodDate" value="'+tdy()+'"><div class="actions"><button class="btn danger" onclick="acFounderLock()">إقفال الفترة</button></div>';
+        return;
+      }
       if(t==='dash'){
         const shops=await b.rpc('acct_founder_group_dashboard',{});
         el.innerHTML='<h3>لوحة موحدة للمحلات</h3><p class="muted">عرض إجمالي للقيود المدينة والدائنة لكل محل. لا يتم دمج دفاتر المحلات أو تعديلها من هذه الشاشة.</p>'+
@@ -105,6 +128,7 @@
   function founderLine(i,acc){return '<div class="f2" style="margin:8px 0"><div><label>الحساب</label><select class="fjeAcc"><option value="">—</option>'+acc.map(a=>'<option value="'+E(a.id)+'">'+E(a.code)+' '+E(a.name)+'</option>').join('')+'</select></div><div style="display:flex;gap:5px"><input class="fjeDebit" type="number" placeholder="مدين"><input class="fjeCredit" type="number" placeholder="دائن"></div></div>'}
   root.acFounderMoreLine=function(){const x=document.getElementById('fjeLines');if(x)x.insertAdjacentHTML('beforeend',founderLine(0,st.fAccounts||[]))};
   root.acFounderAdd=async function(){try{const b=B();await b.rpc('acct_founder_add_account',{p_code:document.getElementById('facCode').value.trim(),p_name:document.getElementById('facName').value.trim(),p_type:document.getElementById('facType').value});root.toast('تمت إضافة حساب المؤسس');acFounderTab('ac')}catch(e){root.toast(fail(e))}};
+  root.acFounderLock=async function(){try{const v=document.getElementById('fPeriodDate').value;if(!v)return root.toast('اختر التاريخ');await B().rpc('acct_founder_lock',{p_until:v});root.toast('تم إقفال فترة المؤسس');acFounderTab('pr')}catch(e){root.toast(fail(e))}};
   root.acFounderPost=async function(){
     const els=[...document.querySelectorAll('#fjeLines .f2')],lines=els.map(x=>({account_id:x.querySelector('.fjeAcc').value,debit:num0(x.querySelector('.fjeDebit').value),credit:num0(x.querySelector('.fjeCredit').value)})).filter(x=>x.account_id&&(x.debit||x.credit));
     const d=sum(lines,x=>x.debit),c=sum(lines,x=>x.credit);if(lines.length<2||Math.abs(d-c)>0.004)return root.toast('القيد يجب أن يتكون من سطرين متوازنين');
