@@ -63,7 +63,7 @@
 
   root.acOpen=function(tab){
     if(!isAdm())return root.toast('للمدير فقط');
-    if(!B()||!B().ok())return root.toast('تتطلب المحاسبة تسجيل الدخول السحابي');
+    if(!B())return root.toast('تعذر تحميل جسر المحاسبة. حدّث التطبيق.');if(!B().ok()){const q=B().status?B().status():{};return root.toast('تعذر فتح المحاسبة: جلسة '+(q.session?'صالحة':'غير موجودة')+'، المحل '+(q.shop?'مرتبط':'غير مرتبط')+'، الدور '+(q.role||'غير معروف')+(q.expired?'، الجلسة منتهية':''));}
     st.tab=tab||st.tab||'tb';if(!st.from)st.from=tdy().slice(0,8)+'01';if(!st.to)st.to=tdy();
     root.modal('المحاسبة',`<div class="actions no-print" style="flex-wrap:wrap;margin-bottom:8px">${TABS.map(([k,l])=>`<button class="btn ${k===st.tab?'primary':''}" onclick="acTab('${k}')">${l}</button>`).join('')}</div><div id="acBody"></div>`);
     acTab(st.tab);
