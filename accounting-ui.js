@@ -77,7 +77,7 @@
       if(t==='dash'){
         const shops=await b.rpc('acct_founder_group_dashboard',{});
         el.innerHTML='<h3>لوحة موحدة للمحلات</h3><p class="muted">عرض إجمالي للقيود المدينة والدائنة لكل محل. لا يتم دمج دفاتر المحلات أو تعديلها من هذه الشاشة.</p>'+
-          (shops.length?tbl([['المحل'],['عدد القيود',1],['مدين',1],['دائن',1]],shops.map(x=>'<tr>'+td(E(x.shop_name))+td(String(x.entries),1)+td(M(num0(x.debit)),1)+td(M(num0(x.credit)),1)+'</tr>')):'<p class="muted">لا توجد محلات مسجلة.</p>');
+          (shops.length?tbl([['المحل'],['القيود',1],['الأصول',1],['الالتزامات',1],['الإيرادات',1],['المصروفات',1],['صافي الربح',1]],shops.map(x=>'<tr>'+td(E(x.shop_name))+td(String(x.entries),1)+td(M(num0(x.assets)),1)+td(M(num0(x.liabilities)),1)+td(M(num0(x.revenue)),1)+td(M(num0(x.expenses)),1)+td(M(num0(x.net_profit)),1)+'</tr>')):'<p class="muted">لا توجد محلات مسجلة.</p>');
         return;
       }
       if(t==='ac'){

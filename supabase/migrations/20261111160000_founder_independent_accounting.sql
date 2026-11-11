@@ -79,14 +79,23 @@ declare uid uuid:=private.acct_founder_assert(); cur date; begin
  if cur is not null and p_until<cur then raise exception 'ORVEX_PERIOD_CLOSED'; end if;
  insert into public.acct_founder_periods(owner_id,locked_until) values(uid,p_until)
  on conflict(owner_id) do update set locked_until=excluded.locked_until,updated_at=now(); return p_until; end $$;
-create or replace function public.acct_founder_group_dashboard()
-returns table(shop_id uuid,shop_name text,entries bigint,debit numeric,credit numeric)
+drop function if exists public.acct_founder_group_dashboard();
+create function public.acct_founder_group_dashboard()
+returns table(shop_id uuid,shop_name text,entries bigint,debit numeric,credit numeric,assets numeric,liabilities numeric,revenue numeric,expenses numeric,net_profit numeric)
 language plpgsql security definer set search_path='' as $$
 begin
  if auth.uid() is null or private.my_role() is distinct from 'founder' or not private.my_device_ok() then raise exception 'ORVEX_FORBIDDEN'; end if;
- return query select s.id,s.name,count(distinct e.id)::bigint,coalesce(sum(l.debit),0)::numeric,coalesce(sum(l.credit),0)::numeric
- from public.shops s left join public.acct_entries e on e.shop_id=s.id left join public.acct_lines l on l.shop_id=e.shop_id and l.entry_id=e.id
- group by s.id,s.name order by s.name; end $$;
+ return query select s.id,s.name,count(distinct e.id)::bigint,coalesce(sum(l.debit),0)::numeric,coalesce(sum(l.credit),0)::numeric,
+ coalesce(sum(case when a.type='asset' then l.debit-l.credit else 0 end),0)::numeric,
+ coalesce(sum(case when a.type='liability' then l.credit-l.debit else 0 end),0)::numeric,
+ coalesce(sum(case when a.type='revenue' then l.credit-l.debit else 0 end),0)::numeric,
+ coalesce(sum(case when a.type='expense' then l.debit-l.credit else 0 end),0)::numeric,
+ coalesce(sum(case when a.type='revenue' then l.credit-l.debit when a.type='expense' then l.credit-l.debit else 0 end),0)::numeric
+ from public.shops s left join public.acct_entries e on e.shop_id=s.id
+ left join public.acct_lines l on l.shop_id=e.shop_id and l.entry_id=e.id
+ left join public.acct_accounts a on a.shop_id=l.shop_id and a.id=l.account_id
+ group by s.id,s.name order by s.name;
+end $$;
 -- Prevent founder role from reading or writing individual shop ledgers; dashboard RPC is read-only.
 create or replace function private.acct_assert_access(p_shop uuid) returns void language plpgsql stable set search_path='' as $$
 begin
