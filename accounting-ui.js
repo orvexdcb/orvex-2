@@ -162,7 +162,7 @@
   root.acAddAccount=async function(){
     const code=(document.getElementById('acCode').value||'').trim(),name=(document.getElementById('acName').value||'').trim(),type=document.getElementById('acType').value,b=B();
     if(!code||!name)return root.toast('أدخل الرمز والاسم');
-    try{await b.post('acct_accounts',{shop_id:b.shop(),code,name,type});st.cache=null;root.toast('تمت الإضافة');acTab('ac')}
+    try{await b.rpc('add_account',{p_shop:b.shop(),p_code:code,p_name:name,p_type:type});st.cache=null;root.toast('تمت الإضافة');acTab('ac')}
     catch(x){root.toast(/23505|duplicate/i.test(String(x&&x.message))?'الرمز مستخدم من قبل':fail(x))}
   };
   root.acClosePeriod=async function(){
