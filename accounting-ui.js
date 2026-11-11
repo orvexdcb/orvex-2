@@ -115,11 +115,12 @@
       <div class="actions"><button class="btn primary" onclick="acAddAccount()">إضافة</button></div><p class="muted" style="font-size:12.5px">الحسابات لا تُحذف؛ يمكن إيقافها فقط. حسابات النظام (الصندوق، المبيعات…) مرتبطة بالترحيل التلقائي.</p>`);
     },
     async pr(){
-      const b=B(),ps=await b.get('periods?shop_id=eq.'+b.shop()+'&select=id,start_date,end_date,status&order=start_date.desc');
-      body(`<div class="card">${ps.length?tbl([['الفترة'],['الحالة']],ps.map(p=>'<tr>'+td(E(p.start_date)+' → '+E(p.end_date))+td(p.status==='closed'?'🔒 مغلقة':'مفتوحة')+'</tr>')):'<p class="muted">لا فترات مسجلة (كل التواريخ مفتوحة).</p>'}</div>
-      <h3 style="margin:12px 0 4px">إقفال شهر</h3><input type="month" id="prM" value="${E(tdy().slice(0,7))}">
-      <div class="actions"><button class="btn danger" onclick="acClosePeriod()">إقفال الشهر</button></div>
-      <p class="muted" style="font-size:12.5px">بعد الإقفال لا تُقبل قيود بتواريخ هذا الشهر ولا يمكن إعادة فتحه. صحّح الأخطاء قبل الإقفال.</p>`);
+      const b=B(),ps=await b.get('acct_periods?shop_id=eq.'+b.shop()+'&select=locked_until,updated_at');
+      const locked=ps[0]&&ps[0].locked_until||null;
+      body(`<div class="card">${locked?'🔒 مقفلة حتى '+E(locked):'لا توجد فترة مقفلة؛ كل التواريخ مفتوحة.'}</div>
+      <h3 style="margin:12px 0 4px">إقفال حتى تاريخ</h3><label>آخر يوم مسموح به في الفترة المقفلة</label><input type="date" id="prUntil" value="${E(locked||tdy())}" min="${E(locked||'1900-01-01')}">
+      <div class="actions"><button class="btn danger" onclick="acClosePeriod()">تأكيد الإقفال</button></div>
+      <p class="muted" style="font-size:12.5px">الإقفال تراكمي ولا يمكن تقليل تاريخ الإقفال أو إعادة فتح فترة سابقة. لن تُقبل قيود بتاريخ يساوي هذا التاريخ أو يسبقه.</p>`);
     }
   };
   function jeDraw(){
@@ -161,17 +162,19 @@
   root.acAddAccount=async function(){
     const code=(document.getElementById('acCode').value||'').trim(),name=(document.getElementById('acName').value||'').trim(),type=document.getElementById('acType').value,b=B();
     if(!code||!name)return root.toast('أدخل الرمز والاسم');
-    try{await b.post('accounts',{shop_id:b.shop(),id:'a'+code,code,name,type});st.cache=null;root.toast('تمت الإضافة');acTab('ac')}
+    try{await b.post('acct_accounts',{shop_id:b.shop(),code,name,type});st.cache=null;root.toast('تمت الإضافة');acTab('ac')}
     catch(x){root.toast(/23505|duplicate/i.test(String(x&&x.message))?'الرمز مستخدم من قبل':fail(x))}
   };
   root.acClosePeriod=async function(){
-    const m=(document.getElementById('prM').value||'').trim();if(!/^\d{4}-\d{2}$/.test(m))return root.toast('اختر الشهر');
-    if(!confirm('إقفال '+m+' نهائيًا؟ لا يمكن إعادة فتحه ولن تُقبل قيود بتواريخه.'))return;
-    const b=B(),id='p-'+m;
+    const until=(document.getElementById('prUntil')?.value||'').trim();
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(until))return root.toast('اختر تاريخًا صحيحًا');
+    const b=B(),current=await b.get('acct_periods?shop_id=eq.'+b.shop()+'&select=locked_until');
+    const locked=current[0]?.locked_until||null;
+    if(locked&&until<locked)return root.toast('لا يمكن تقليل تاريخ الإقفال أو إعادة فتح فترة سابقة');
+    if(!confirm('إقفال جميع القيود حتى '+until+'؟ لا يمكن التراجع عن هذا الإقفال.'))return;
     try{
-      try{await b.post('periods',{shop_id:b.shop(),id,start_date:m+'-01',end_date:monthEnd(m),status:'open'})}catch(x){if(!/23505|duplicate/i.test(String(x&&x.message)))throw x}
-      await b.patch('periods?shop_id=eq.'+b.shop()+'&id=eq.'+encodeURIComponent(id),{status:'closed',closed_by:who()});
-      root.toast('تم إقفال '+m);acTab('pr');
+      await b.rpc('set_period_lock',{p_shop:b.shop(),p_until:until});
+      root.toast('تم الإقفال حتى '+until);acTab('pr');
     }catch(x){root.toast(fail(x))}
   };
   if(typeof vParties==='function'){const _v=vParties;vParties=function(){return _v()+(isAdm()?'<div class="actions"><button class="btn" onclick="acOpen()">📚 المحاسبة</button></div>':'')}}
