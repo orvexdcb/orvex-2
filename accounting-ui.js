@@ -61,8 +61,58 @@
   const td=(v,n)=>`<td${n?' class="n"':''}>${v}</td>`;
   async function tbRows(from,to){const b=B();return b.rpc('trial_balance',{p_shop:b.shop(),p_from:from,p_to:to})}
 
+  async function founderOpen(){
+    root.modal('محاسبة المؤسس',`<div class="actions no-print" style="flex-wrap:wrap;margin-bottom:8px">
+      <button class="btn primary" onclick="acFounderTab('dash')">لوحة المحلات</button>
+      <button class="btn" onclick="acFounderTab('tb')">محاسبتي المستقلة</button>
+      <button class="btn" onclick="acFounderTab('ac')">دليل حساباتي</button>
+      <button class="btn" onclick="acFounderTab('je')">قيد للمؤسس</button>
+    </div><div id="acBody"><p class="muted">جارٍ التحميل…</p></div>`);
+    await acFounderTab('dash');
+  }
+  root.acFounderTab=async function(t){
+    const b=B(),el=document.getElementById('acBody');if(!el)return;
+    el.innerHTML='<p class="muted">جارٍ التحميل…</p>';
+    try{
+      if(t==='dash'){
+        const shops=await b.rpc('acct_founder_group_dashboard',{});
+        el.innerHTML='<h3>لوحة موحدة للمحلات</h3><p class="muted">عرض إجمالي للقيود المدينة والدائنة لكل محل. لا يتم دمج دفاتر المحلات أو تعديلها من هذه الشاشة.</p>'+
+          (shops.length?tbl([['المحل'],['عدد القيود',1],['مدين',1],['دائن',1]],shops.map(x=>'<tr>'+td(E(x.shop_name))+td(String(x.entries),1)+td(M(num0(x.debit)),1)+td(M(num0(x.credit)),1)+'</tr>')):'<p class="muted">لا توجد محلات مسجلة.</p>');
+        return;
+      }
+      if(t==='ac'){
+        await b.rpc('acct_founder_seed',{});
+        const acc=await b.get('acct_founder_accounts?select=id,code,name,type,is_active&order=code');
+        st.fAccounts=acc;
+        el.innerHTML='<h3>دليل حسابات المؤسس المستقل</h3>'+tbl([['الرمز'],['الحساب'],['النوع']],acc.map(a=>'<tr>'+td(E(a.code))+td(E(a.name))+td(TYPES[a.type]||E(a.type))+'</tr>'))+
+          '<h4>إضافة حساب</h4><div class="f2"><div><label>الرمز</label><input id="facCode"></div><div><label>الاسم</label><input id="facName"></div></div><label>النوع</label><select id="facType">'+Object.keys(TYPES).map(k=>'<option value="'+k+'">'+TYPES[k]+'</option>').join('')+'</select><div class="actions"><button class="btn primary" onclick="acFounderAdd()">إضافة الحساب</button></div>';
+        return;
+      }
+      if(t==='tb'){
+        await b.rpc('acct_founder_seed',{});
+        const rows=await b.rpc('acct_founder_trial_balance',{p_from:'1900-01-01',p_to:tdy()});
+        const totalD=sum(rows,x=>num0(x.debit)),totalC=sum(rows,x=>num0(x.credit));
+        el.innerHTML='<h3>ميزان مراجعة المؤسس</h3>'+tbl([['الحساب'],['مدين',1],['دائن',1],['الرصيد',1]],rows.map(x=>'<tr>'+td(E(x.code)+' '+E(x.name))+td(M(num0(x.debit)),1)+td(M(num0(x.credit)),1)+td(M(num0(x.balance)),1)+'</tr>'))+'<p><b>إجمالي المدين: '+M(totalD)+' — إجمالي الدائن: '+M(totalC)+'</b></p>';
+        return;
+      }
+      if(t==='je'){
+        await b.rpc('acct_founder_seed',{});
+        const acc=await b.get('acct_founder_accounts?select=id,code,name&is_active=eq.true&order=code');st.fAccounts=acc;
+        el.innerHTML='<h3>قيد مستقل للمؤسس</h3><label>التاريخ</label><input type="date" id="fjeDate" value="'+tdy()+'"><label>البيان</label><input id="fjeMemo"><div id="fjeLines">'+[0,1].map(i=>founderLine(i,acc)).join('')+'</div><div class="actions"><button class="btn" onclick="acFounderMoreLine()">+ سطر</button><button class="btn primary" onclick="acFounderPost()">ترحيل القيد</button></div>';
+      }
+    }catch(e){el.innerHTML='<p style="color:#b23f2d">'+E(fail(e))+'</p>'}
+  };
+  function founderLine(i,acc){return '<div class="f2" style="margin:8px 0"><div><label>الحساب</label><select class="fjeAcc"><option value="">—</option>'+acc.map(a=>'<option value="'+E(a.id)+'">'+E(a.code)+' '+E(a.name)+'</option>').join('')+'</select></div><div style="display:flex;gap:5px"><input class="fjeDebit" type="number" placeholder="مدين"><input class="fjeCredit" type="number" placeholder="دائن"></div></div>'}
+  root.acFounderMoreLine=function(){const x=document.getElementById('fjeLines');if(x)x.insertAdjacentHTML('beforeend',founderLine(0,st.fAccounts||[]))};
+  root.acFounderAdd=async function(){try{const b=B();await b.rpc('acct_founder_add_account',{p_code:document.getElementById('facCode').value.trim(),p_name:document.getElementById('facName').value.trim(),p_type:document.getElementById('facType').value});root.toast('تمت إضافة حساب المؤسس');acFounderTab('ac')}catch(e){root.toast(fail(e))}};
+  root.acFounderPost=async function(){
+    const els=[...document.querySelectorAll('#fjeLines .f2')],lines=els.map(x=>({account_id:x.querySelector('.fjeAcc').value,debit:num0(x.querySelector('.fjeDebit').value),credit:num0(x.querySelector('.fjeCredit').value)})).filter(x=>x.account_id&&(x.debit||x.credit));
+    const d=sum(lines,x=>x.debit),c=sum(lines,x=>x.credit);if(lines.length<2||Math.abs(d-c)>0.004)return root.toast('القيد يجب أن يتكون من سطرين متوازنين');
+    try{const r=await B().rpc('acct_founder_post',{p_entry:{id:'founder-'+Date.now().toString(36),entry_date:document.getElementById('fjeDate').value,memo:document.getElementById('fjeMemo').value||'قيد مؤسس',created_by:who(),lines}});if(r!=='posted')return root.toast('القيد مسجل مسبقاً');root.toast('تم ترحيل قيد المؤسس');acFounderTab('tb')}catch(e){root.toast(fail(e))}
+  };
   root.acOpen=function(tab){
     if(!isAdm())return root.toast('للمدير فقط');
+    if(B()&&B().isFounder&&B().isFounder()){return founderOpen()}
     if(!B())return root.toast('تعذر تحميل جسر المحاسبة. حدّث التطبيق.');if(!B().ok()){const q=B().status?B().status():{};return root.toast('تعذر فتح المحاسبة: جلسة '+(q.session?'صالحة':'غير موجودة')+'، المحل '+(q.shop?'مرتبط':'غير مرتبط')+'، الدور '+(q.role||'غير معروف')+(q.expired?'، الجلسة منتهية':''));}
     st.tab=tab||st.tab||'tb';if(!st.from)st.from=tdy().slice(0,8)+'01';if(!st.to)st.to=tdy();
     root.modal('المحاسبة',`<div class="actions no-print" style="flex-wrap:wrap;margin-bottom:8px">${TABS.map(([k,l])=>`<button class="btn ${k===st.tab?'primary':''}" onclick="acTab('${k}')">${l}</button>`).join('')}</div><div id="acBody"></div>`);
