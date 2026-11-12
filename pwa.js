@@ -10,7 +10,7 @@
   try{
     if('serviceWorker' in navigator && location.protocol.indexOf('http')===0){
       var hadCtl=!!navigator.serviceWorker.controller;
-      navigator.serviceWorker.addEventListener('controllerchange',function(){if(hadCtl)showUpdate()});
+      navigator.serviceWorker.addEventListener('controllerchange',function(){if(hadCtl&&!window.__orvexUpdating)showUpdate()});
       window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})});
     }
   }catch(e){}
@@ -23,7 +23,7 @@
     var s=document.createElement('span');s.style.flex='1';s.textContent=T('upd');
     var r=document.createElement('button');r.textContent=T('reload');
     r.style.cssText='background:#fff;color:#0c6a64;border:0;border-radius:8px;padding:6px 10px;font:inherit;font-weight:600;cursor:pointer';
-    r.addEventListener('click',function(){location.reload()});
+    r.addEventListener('click',function(){try{if(typeof window.__orvexPrepareUpdate==='function')window.__orvexPrepareUpdate()}catch(e){}location.reload()});
     var l=document.createElement('button');l.textContent=T('later');
     l.style.cssText='background:transparent;color:#fff;border:0;padding:6px;font:inherit;cursor:pointer';
     l.addEventListener('click',function(){b.remove()});
@@ -43,6 +43,28 @@
   }catch(e){}
 
 
+  function applyUpdate(){
+    return new Promise(function(resolve){
+      if(!('serviceWorker' in navigator))return resolve();
+      var done=false;function fin(){if(!done){done=true;resolve()}}
+      setTimeout(fin,10000);
+      navigator.serviceWorker.getRegistration().then(function(reg){
+        if(!reg)return fin();
+        function watch(w){
+          if(!w)return fin();
+          if(w.state==='activated')return fin();
+          w.addEventListener('statechange',function(){if(w.state==='activated')fin()});
+        }
+        if(reg.waiting){try{reg.waiting.postMessage({type:'SKIP_WAITING'})}catch(e){}return watch(reg.waiting)}
+        reg.update().then(function(){
+          if(reg.installing)watch(reg.installing);
+          else if(reg.waiting){try{reg.waiting.postMessage({type:'SKIP_WAITING'})}catch(e){}watch(reg.waiting)}
+          else fin();
+        }).catch(fin);
+      }).catch(fin);
+    });
+  }
+
   /* 4) زر تحديث يدوي دائم بعد تسجيل الدخول، لجميع الأدوار والأجهزة */
   function addManualUpdate(){
     var s=typeof window.__orvexStatus==='function'?window.__orvexStatus():null;
@@ -61,12 +83,10 @@
       b.disabled=true;b.textContent='جارٍ التحديث…';
       /* احفظ رمز الجلسة الحالي قبل إعادة تحميل التطبيق؛ لا تحفظ كلمة المرور ولا بيانات المتجر هنا. */
       try{if(typeof window.__orvexPrepareUpdate==='function')window.__orvexPrepareUpdate()}catch(e){}
-      try{
-        if('serviceWorker' in navigator){
-          var reg=await navigator.serviceWorker.getRegistration();
-          if(reg)await reg.update().catch(function(){});
-        }
-      }catch(e){}
+      window.__orvexUpdating=true;
+      /* انتظر تثبيت وتفعيل النسخة الجديدة من Service Worker (بحد أقصى 10 ثوانٍ) قبل إعادة التحميل؛
+         هذا لا يمس الجلسة ولا يستدعي تسجيل الخروج. عند الفشل نعيد التحميل على أي حال. */
+      try{await applyUpdate()}catch(e){}
       location.reload();
     });
     document.body.appendChild(b);

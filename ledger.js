@@ -60,8 +60,8 @@ function entries(){const d=ensure(),by=byId(),keyId={};accounts().forEach(a=>{if
     const ex=A_.expected(d,(d.settings&&d.settings.ledgerStart)||'');
     ex.skipped.forEach(s=>warn.push('قيد غير متوازن: '+s.source+' '+s.id));
     ex.entries.forEach(e=>{
-      let doc=null;if(e.source==='sale')doc=d.sales.find(x=>x.id===e.docId);else if(e.source==='purchase')doc=d.purchases.find(x=>x.id===e.docId);
-      const bk=doc&&(doc.method==='card'||doc.method==='transfer')?bankFor(doc.method):null;
+      let doc=null;if(e.source==='sale')doc=d.sales.find(x=>x.id===e.docId);else if(e.source==='purchase')doc=d.purchases.find(x=>x.id===e.docId);else if(e.source==='preturn')doc=(d.preturns||[]).find(x=>x.id===e.docId);
+      const dm=doc&&(doc.cashMethod||doc.method),bk=doc&&(dm==='card'||dm==='transfer')?bankFor(dm):null;
       const lines=e.lines.map(l=>({a:l.key==='bank'&&bk?bk:keyId[l.key],d:l.debit,c:l.credit}));
       if(lines.some(l=>!l.a||!by[l.a])){warn.push('حساب مفقود في '+e.key);return}
       out.push({key:e.key,src:e.source,date:e.date,memo:e.memo,lines})})}
@@ -93,6 +93,38 @@ function balanceSheet(rows){const side=(t,s)=>rows.filter(x=>x.type===t&&x.balan
   assets=side('asset',1),liab=side('liability',-1),eq=side('equity',-1),is=incomeStatement(rows),A_=sm(assets,x=>x.amount),L_=sm(liab,x=>x.amount),E_=sm(eq,x=>x.amount);
   return{assets,liab,eq,assetsTotal:A_,liabTotal:L_,eqTotal:E_,earnings:is.net,balanced:Math.abs(A_-(L_+E_+is.net))<0.01}}
 const totals=rows=>({debit:sm(rows,x=>x.debit),credit:sm(rows,x=>x.credit)});
+
+/* ===== التدفقات النقدية (طريقة مباشرة) — مشتقة من القيود، لا تُخزَّن ===== */
+const CF_SRC={sale:'مقبوضات المبيعات',return:'مردودات المبيعات المدفوعة',purchase:'مدفوعات المشتريات',preturn:'مقبوضات مرتجع الشراء',expense:'مصروفات تشغيلية',payment:'تحصيل/سداد الذمم',landed:'تكاليف وصول',closing:'عجز/زيادة الصندوق',stocktake:'تسويات جرد',mfg:'تصنيع',asset:'شراء أصول ثابتة',asset_dep:'إهلاك',asset_disposal:'بيع/شطب أصول',manual:'قيود يدوية'};
+function cashFlow(from,to){const by=byId(),isCash=id=>{const a=by[id];return !!a&&(a.key==='cash'||a.key==='bank'||!!a.bank)};
+  const sec={operating:{},investing:{},financing:{}};let open=0,close=0,net=0;
+  entries().list.forEach(e=>{let c=0,eq=false,fa=false;e.lines.forEach(l=>{const a=by[l.a];if(isCash(l.a))c=R2(c+l.d-l.c);else if(a){if(a.type==='equity')eq=true;if(a.key==='fixed_assets')fa=true}});
+    if(!c)return;if(to&&e.date>to)return;close=R2(close+c);
+    if(from&&e.date<from){open=R2(open+c);return}
+    const sc=e.src==='asset'||e.src==='asset_disposal'||(e.src==='manual'&&fa)?'investing':(e.src==='manual'&&eq)?'financing':'operating';
+    const k=CF_SRC[e.src]||e.src;sec[sc][k]=R2((sec[sc][k]||0)+c);net=R2(net+c)});
+  const rows=o=>Object.keys(o).map(k=>({name:k,amount:o[k]})),tot=o=>R2(Object.keys(o).reduce((a,k)=>a+o[k],0));
+  const r={operating:rows(sec.operating),investing:rows(sec.investing),financing:rows(sec.financing),opTotal:tot(sec.operating),invTotal:tot(sec.investing),finTotal:tot(sec.financing),opening:open,net,closing:close};
+  r.reconciled=Math.abs(R2(open+net)-close)<0.005&&Math.abs(R2(r.opTotal+r.invTotal+r.finTotal)-net)<0.005;return r}
+
+/* ===== أعمار الديون: عملاء (c) أو موردون (s) — مشتقة من المستندات؛ الدفعات والمرتجعات تُسدَّد بها الأقدم أولًا ===== */
+const BUCKETS=[['0-30',0,30],['31-60',31,60],['61-90',61,90],['90+',91,1e9]];
+const dayDiff=(a,b)=>Math.floor((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/864e5);
+function aging(type,asOf){const d=ensure(),c=type==='c',list=c?(d.customers||[]):(d.suppliers||[]),as=asOf||tdy(),rows=[];
+  list.forEach(p=>{const debits=[],credits=[];let cr=0;
+    if(c){(d.sales||[]).forEach(s=>{if(s.void||s.cid!==p.id||s.date>as)return;const r=R2(R2(s.total)-Math.min(R2(s.paid),R2(s.total)));if(r>0.004)debits.push({date:s.date,amt:r,no:s.no})});
+      (d.returns||[]).forEach(r=>{if(r.cid===p.id&&r.method==='balance'&&r.date<=as)credits.push({date:r.date,amt:R2(r.total)})})}
+    else{(d.purchases||[]).forEach(o=>{if(o.sid!==p.id||o.date>as)return;const r=R2(R2(o.total)-Math.min(R2(o.paid),R2(o.total)));if(r>0.004)debits.push({date:o.date,amt:r,no:o.no})});
+      (d.preturns||[]).forEach(r=>{if(!r.void&&r.sid===p.id&&r.date<=as&&R2(r.apPart)>0)credits.push({date:r.date,amt:R2(r.apPart)})})}
+    (d.payments||[]).forEach(y=>{if(y.type===type&&y.pid===p.id&&y.date<=as)credits.push({date:y.date,amt:R2(y.amount)})});
+    credits.forEach(x=>cr=R2(cr+x.amt));debits.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+    debits.forEach(x=>{const t=Math.min(x.amt,cr);x.amt=R2(x.amt-t);cr=R2(cr-t)});
+    const open=debits.filter(x=>x.amt>0.004),b=BUCKETS.map(()=>0);
+    open.forEach(x=>{const n=Math.max(0,dayDiff(x.date,as)),i=BUCKETS.findIndex(k=>n>=k[1]&&n<=k[2]);b[i]=R2(b[i]+x.amt)});
+    const docs=R2(b.reduce((a,x)=>a+x,0)),bal=R2(p.balance||0),unalloc=R2(bal-docs);   /* ما لا تفسّره المستندات: رصيد افتتاحي، أو دفعة زائدة (سالب) */
+    if(docs||Math.abs(unalloc)>0.004)rows.push({id:p.id,name:p.name,buckets:b,docs,unallocated:unalloc,balance:bal,invoices:open.map(x=>({no:x.no,date:x.date,amount:x.amt}))})});
+  const tot=BUCKETS.map((_,i)=>R2(rows.reduce((a,r)=>a+r.buckets[i],0)));
+  return{asOf:as,labels:BUCKETS.map(x=>x[0]),rows,totals:tot,docsTotal:R2(tot.reduce((a,x)=>a+x,0)),unallocatedTotal:R2(rows.reduce((a,r)=>a+r.unallocated,0)),balanceTotal:R2(rows.reduce((a,r)=>a+r.balance,0))}}
 
 /* ===== القيود اليدوية ===== */
 const lockDate=()=>(D().settings||{}).lockDate||'';
@@ -136,7 +168,7 @@ function recFinalize(bankId,date,stmt,keys){const d=ensure();if(!isAdm()&&!canf(
 const cell=v=>{if(typeof v==='number')return String(R2(v));let s=String(v==null?'':v);if(/^[=+\-@\t\r]/.test(s))s="'"+s;return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
 const toCSV=(head,rows)=>'\ufeff'+[head].concat(rows).map(r=>r.map(cell).join(',')).join('\r\n')+'\r\n';
 
-root.ORVEX_LED={accounts,acctAdd,acctToggle,bankAdd,bankFor,entries,tb,incomeStatement,balanceSheet,totals,jeCreate,jeReverse,bankItems,recState,recFinalize,toCSV,TYPES,BASE};
+root.ORVEX_LED={accounts,acctAdd,acctToggle,bankAdd,bankFor,entries,tb,incomeStatement,balanceSheet,totals,cashFlow,aging,jeCreate,jeReverse,bankItems,recState,recFinalize,toCSV,TYPES,BASE};
 
 /* ================= الواجهة ================= */
 if(typeof document==='undefined'||!root.modal)return;

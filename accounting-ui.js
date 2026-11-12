@@ -50,94 +50,20 @@
   const isAdm=()=>typeof isAdmin!=='undefined'&&!!isAdmin();
   const who=()=>typeof curUser!=='undefined'?((curUser()||{}).name||''):'';
   const tdy=()=>typeof today!=='undefined'?today():new Date().toISOString().slice(0,10);
-  const TABS=[['tb','ميزان المراجعة'],['is','قائمة الدخل'],['bs','الميزانية'],['je','قيد يدوي'],['ac','الحسابات'],['pr','الفترات']];
+  const TABS=[['tb','ميزان المراجعة'],['is','قائمة الدخل'],['bs','الميزانية'],['cf','التدفقات النقدية'],['ag','أعمار الديون'],['je','قيد يدوي'],['ac','الحسابات'],['pr','الفترات']];
   const TYPES={asset:'أصول',liability:'التزامات',equity:'حقوق ملكية',revenue:'إيرادات',expense:'مصروفات'};
   const st=root.__ac={tab:'tb',from:'',to:'',cache:null,je:null};
   const fail=e=>{const m=String(e&&e.message||e);
     return /Could not find the function|PGRST202|relation .* does not exist|42P01/i.test(m)?'قاعدة Supabase تحتاج ترحيل المحاسبة 006 وتشغيل seed_default_accounts أولًا.':
-      /ORVEX_PERIOD_CLOSED/.test(m)?'التاريخ يقع في فترة مغلقة.':/ORVEX_ENTRY_UNBALANCED/.test(m)?'القيد غير متوازن.':/row-level security|42501|permission denied/i.test(m)?'ليست لديك صلاحية (للمدير فقط).':m};
+      /ORVEX_PERIOD_CLOSED/.test(m)?'التاريخ يقع في فترة مغلقة.':/ORVEX_UNBALANCED/.test(m)?'القيد غير متوازن.':/row-level security|42501|permission denied/i.test(m)?'ليست لديك صلاحية (للمدير فقط).':m};
   const body=h=>{const b=document.getElementById('acBody');if(b)b.innerHTML=h};
   const tbl=(head,rows,foot)=>`<div class="table-wrap"><table><tr>${head.map(h=>`<th${h[1]?' class="n"':''}>${h[0]}</th>`).join('')}</tr>${rows.join('')}${foot||''}</table></div>`;
   const td=(v,n)=>`<td${n?' class="n"':''}>${v}</td>`;
   async function tbRows(from,to){const b=B();return b.rpc('trial_balance',{p_shop:b.shop(),p_from:from,p_to:to})}
 
-  async function founderOpen(){
-    root.modal('المحاسبة',`<div class="actions no-print" style="flex-wrap:wrap;margin-bottom:8px">${[['tb','ميزان المراجعة'],['is','قائمة الدخل'],['bs','الميزانية'],['je','قيد يدوي'],['ac','الحسابات'],['pr','الفترات']].map(([k,l])=>`<button class="btn" onclick="acFounderTab('${k}')">${l}</button>`).join('')}</div>
-      <div class="actions no-print" style="margin-bottom:8px"><button class="btn primary" onclick="acFounderTab('dash')">📊 لوحة المحلات</button></div>
-      <div id="acBody"><p class="muted">جارٍ التحميل…</p></div>`);
-    await acFounderTab('tb');
-  }
-  root.acFounderTab=async function(t){
-    const b=B(),el=document.getElementById('acBody');if(!el)return;
-    el.innerHTML='<p class="muted">جارٍ التحميل…</p>';
-    try{
-      if(t==='shops'){
-        const accounts=await b.rpc('acct_founder_shop_accounts',{});
-        const groups={};accounts.forEach(a=>(groups[a.shop_id]??={name:a.shop_name,rows:[]}).rows.push(a));
-        const cards=Object.values(groups).map(g=>'<section class="card" style="margin:10px 0"><h3>'+E(g.name)+'</h3>'+tbl([['الرمز'],['الحساب'],['النوع'],['الحالة']],g.rows.map(a=>'<tr>'+td(E(a.code))+td(E(a.account_name))+td(TYPES[a.account_type]||E(a.account_type))+td(a.is_active?'نشط':'موقوف')+'</tr>'))+'</section>');
-        el.innerHTML='<h3>🏬 دليل حسابات المحلات</h3><p class="muted">عرض فقط. حسابات كل محل تبقى مستقلة ولا يمكن تعديلها من حساب المؤسس.</p>'+(cards.length?cards.join(''):'<p class="muted">لا توجد حسابات محاسبية للمحلات بعد.</p>');
-        return;
-      }
-      if(t==='is'||t==='bs'){
-        await b.rpc('acct_founder_seed',{});
-        const rows=await b.rpc('acct_founder_trial_balance',{p_from:'1900-01-01',p_to:tdy()});
-        if(t==='is'){
-          const r=incomeStatement(rows);
-          el.innerHTML='<h3>قائمة دخل المؤسس</h3>'+tbl([['البند'],['المبلغ',1]],r.rev.map(x=>'<tr>'+td(E(x.name))+td(M(x.amount),1)+'</tr>').concat(['<tr><td><b>إجمالي الإيرادات</b></td>'+td('<b>'+M(r.revenue)+'</b>',1)+'</tr>'],r.exp.map(x=>'<tr>'+td(E(x.name))+td(M(x.amount),1)+'</tr>'),['<tr><td><b>إجمالي المصروفات</b></td>'+td('<b>'+M(r.expense)+'</b>',1)+'</tr>','<tr><td><b>صافي الربح</b></td>'+td('<b>'+M(r.net)+'</b>',1)+'</tr>']));
-        }else{
-          const r=balanceSheet(rows);
-          const section=(name,arr)=>'<tr><td colspan="2"><b>'+name+'</b></td></tr>'+arr.map(x=>'<tr>'+td(E(x.name))+td(M(x.amount),1)+'</tr>').join('');
-          el.innerHTML='<h3>ميزانية المؤسس</h3>'+tbl([['البند'],['المبلغ',1]],[section('الأصول',r.assets),'<tr><td><b>إجمالي الأصول</b></td>'+td(M(r.assetsTotal),1)+'</tr>',section('الالتزامات',r.liab),'<tr><td><b>إجمالي الالتزامات</b></td>'+td(M(r.liabTotal),1)+'</tr>',section('حقوق الملكية',r.eq),'<tr><td>أرباح الفترات</td>'+td(M(r.earnings),1)+'</tr>','<tr><td><b>إجمالي حقوق الملكية</b></td>'+td(M(r.equityWithEarnings),1)+'</tr>'].join(''))+'<p>'+(r.balanced?'✓ الميزانية متوازنة':'الميزانية تحتاج مراجعة')+'</p>';
-        }
-        return;
-      }
-      if(t==='pr'){
-        const periods=await b.get('acct_founder_periods?select=locked_until,updated_at');
-        const locked=periods[0]?.locked_until||'لا توجد فترة مقفلة';
-        el.innerHTML='<h3>فترات المؤسس</h3><div class="card">'+E(locked)+'</div><label>إقفال حتى تاريخ</label><input type="date" id="fPeriodDate" value="'+tdy()+'"><div class="actions"><button class="btn danger" onclick="acFounderLock()">إقفال الفترة</button></div>';
-        return;
-      }
-      if(t==='dash'){
-        const shops=await b.rpc('acct_founder_group_dashboard',{});
-        el.innerHTML='<h3>لوحة موحدة للمحلات</h3><p class="muted">عرض إجمالي للقيود المدينة والدائنة لكل محل. لا يتم دمج دفاتر المحلات أو تعديلها من هذه الشاشة.</p>'+
-          (shops.length?tbl([['المحل'],['القيود',1],['الأصول',1],['الالتزامات',1],['الإيرادات',1],['المصروفات',1],['صافي الربح',1]],shops.map(x=>'<tr>'+td(E(x.shop_name))+td(String(x.entries),1)+td(M(num0(x.assets)),1)+td(M(num0(x.liabilities)),1)+td(M(num0(x.revenue)),1)+td(M(num0(x.expenses)),1)+td(M(num0(x.net_profit)),1)+'</tr>')):'<p class="muted">لا توجد محلات مسجلة.</p>');
-        return;
-      }
-      if(t==='ac'){
-        await b.rpc('acct_founder_seed',{});
-        const acc=await b.get('acct_founder_accounts?select=id,code,name,type,is_active&order=code');
-        st.fAccounts=acc;
-        el.innerHTML='<h3>دليل حسابات المؤسس المستقل</h3>'+tbl([['الرمز'],['الحساب'],['النوع']],acc.map(a=>'<tr>'+td(E(a.code))+td(E(a.name))+td(TYPES[a.type]||E(a.type))+'</tr>'))+
-          '<h4>إضافة حساب</h4><div class="f2"><div><label>الرمز</label><input id="facCode"></div><div><label>الاسم</label><input id="facName"></div></div><label>النوع</label><select id="facType">'+Object.keys(TYPES).map(k=>'<option value="'+k+'">'+TYPES[k]+'</option>').join('')+'</select><div class="actions"><button class="btn primary" onclick="acFounderAdd()">إضافة الحساب</button></div>';
-        return;
-      }
-      if(t==='tb'){
-        await b.rpc('acct_founder_seed',{});
-        const rows=await b.rpc('acct_founder_trial_balance',{p_from:'1900-01-01',p_to:tdy()});
-        const totalD=sum(rows,x=>num0(x.debit)),totalC=sum(rows,x=>num0(x.credit));
-        el.innerHTML='<h3>ميزان مراجعة المؤسس</h3>'+tbl([['الحساب'],['مدين',1],['دائن',1],['الرصيد',1]],rows.map(x=>'<tr>'+td(E(x.code)+' '+E(x.name))+td(M(num0(x.debit)),1)+td(M(num0(x.credit)),1)+td(M(num0(x.balance)),1)+'</tr>'))+'<p><b>إجمالي المدين: '+M(totalD)+' — إجمالي الدائن: '+M(totalC)+'</b></p>';
-        return;
-      }
-      if(t==='je'){
-        await b.rpc('acct_founder_seed',{});
-        const acc=await b.get('acct_founder_accounts?select=id,code,name&is_active=eq.true&order=code');st.fAccounts=acc;
-        el.innerHTML='<h3>قيد مستقل للمؤسس</h3><label>التاريخ</label><input type="date" id="fjeDate" value="'+tdy()+'"><label>البيان</label><input id="fjeMemo"><div id="fjeLines">'+[0,1].map(i=>founderLine(i,acc)).join('')+'</div><div class="actions"><button class="btn" onclick="acFounderMoreLine()">+ سطر</button><button class="btn primary" onclick="acFounderPost()">ترحيل القيد</button></div>';
-      }
-    }catch(e){el.innerHTML='<p style="color:#b23f2d">'+E(fail(e))+'</p>'}
-  };
-  function founderLine(i,acc){return '<div class="f2" style="margin:8px 0"><div><label>الحساب</label><select class="fjeAcc"><option value="">—</option>'+acc.map(a=>'<option value="'+E(a.id)+'">'+E(a.code)+' '+E(a.name)+'</option>').join('')+'</select></div><div style="display:flex;gap:5px"><input class="fjeDebit" type="number" placeholder="مدين"><input class="fjeCredit" type="number" placeholder="دائن"></div></div>'}
-  root.acFounderMoreLine=function(){const x=document.getElementById('fjeLines');if(x)x.insertAdjacentHTML('beforeend',founderLine(0,st.fAccounts||[]))};
-  root.acFounderAdd=async function(){try{const b=B();await b.rpc('acct_founder_add_account',{p_code:document.getElementById('facCode').value.trim(),p_name:document.getElementById('facName').value.trim(),p_type:document.getElementById('facType').value});root.toast('تمت إضافة حساب المؤسس');acFounderTab('ac')}catch(e){root.toast(fail(e))}};
-  root.acFounderLock=async function(){try{const v=document.getElementById('fPeriodDate').value;if(!v)return root.toast('اختر التاريخ');await B().rpc('acct_founder_lock',{p_until:v});root.toast('تم إقفال فترة المؤسس');acFounderTab('pr')}catch(e){root.toast(fail(e))}};
-  root.acFounderPost=async function(){
-    const els=[...document.querySelectorAll('#fjeLines .f2')],lines=els.map(x=>({account_id:x.querySelector('.fjeAcc').value,debit:num0(x.querySelector('.fjeDebit').value),credit:num0(x.querySelector('.fjeCredit').value)})).filter(x=>x.account_id&&(x.debit||x.credit));
-    const d=sum(lines,x=>x.debit),c=sum(lines,x=>x.credit);if(lines.length<2||Math.abs(d-c)>0.004)return root.toast('القيد يجب أن يتكون من سطرين متوازنين');
-    try{const r=await B().rpc('acct_founder_post',{p_entry:{id:'founder-'+Date.now().toString(36),entry_date:document.getElementById('fjeDate').value,memo:document.getElementById('fjeMemo').value||'قيد مؤسس',created_by:who(),lines}});if(r!=='posted')return root.toast('القيد مسجل مسبقاً');root.toast('تم ترحيل قيد المؤسس');acFounderTab('tb')}catch(e){root.toast(fail(e))}
-  };
   root.acOpen=function(tab){
     if(!isAdm())return root.toast('للمدير فقط');
-    if(B()&&B().isFounder&&B().isFounder()){return founderOpen()}
-    if(!B())return root.toast('تعذر تحميل جسر المحاسبة. حدّث التطبيق.');if(!B().ok()){const q=B().status?B().status():{};return root.toast('تعذر فتح المحاسبة: جلسة '+(q.session?'صالحة':'غير موجودة')+'، المحل '+(q.shop?'مرتبط':'غير مرتبط')+'، الدور '+(q.role||'غير معروف')+(q.expired?'، الجلسة منتهية':''));}
+    if(!B()||!B().ok())return root.toast('تتطلب المحاسبة تسجيل الدخول السحابي');
     st.tab=tab||st.tab||'tb';if(!st.from)st.from=tdy().slice(0,8)+'01';if(!st.to)st.to=tdy();
     root.modal('المحاسبة',`<div class="actions no-print" style="flex-wrap:wrap;margin-bottom:8px">${TABS.map(([k,l])=>`<button class="btn ${k===st.tab?'primary':''}" onclick="acTab('${k}')">${l}</button>`).join('')}</div><div id="acBody"></div>`);
     acTab(st.tab);
@@ -154,6 +80,7 @@
       b.insertAdjacentHTML('beforeend','<div class="actions no-print"><button class="btn" onclick="acExport()">⬇ تصدير Excel (CSV)</button><button class="btn" onclick="window.print()">🖨 طباعة / PDF</button></div>');
     }
   };
+  root.acAgType=function(t){st.agType=t==='s'?'s':'c';acTab('ag')};
   root.acRange=function(f,t){if(f)st.from=f;if(t)st.to=t;acTab(st.tab)};
   const range=()=>`<div class="f2"><div><label>من</label><input type="date" value="${E(st.from)}" onchange="acRange(this.value,'')"></div><div><label>إلى</label><input type="date" value="${E(st.to)}" onchange="acRange('',this.value)"></div></div>`;
   const row=(a,b,bold)=>`<div class="row"><div class="grow">${bold?'<b>'+a+'</b>':a}</div><div class="end">${bold?'<b>'+M(b)+'</b>':M(b)}</div></div>`;
@@ -176,6 +103,29 @@
       const sec=(t,a)=>`<div class="card" style="margin-top:8px"><b>${t}</b>${a.map(x=>row(E(x.name),x.amount)).join('')}</div>`;
       body(`<div class="f2"><div><label>كما في تاريخ</label><input type="date" value="${E(st.to)}" onchange="acRange('',this.value)"></div></div>`+sec('الأصول',r.assets)+row('إجمالي الأصول',r.assetsTotal,1)+sec('الالتزامات',r.liab)+row('إجمالي الالتزامات',r.liabTotal,1)+sec('حقوق الملكية',r.eq.concat([{name:'أرباح/خسائر الفترات غير المقفلة',amount:r.earnings}]))+row('إجمالي حقوق الملكية',r.equityWithEarnings,1)+`<p style="margin-top:8px">${r.balanced?'✓ الأصول = الالتزامات + حقوق الملكية':'<b style="color:#b23f2d">الميزانية غير متوازنة — راجع القيود</b>'}</p>`);
     },
+    /* التدفقات النقدية وأعمار الديون مشتقة محليًا من دفتر ledger.js (قراءة فقط، لا تغيّر أي بيانات) */
+    async cf(){
+      const L=root.ORVEX_LED;if(!L||!L.cashFlow)throw new Error('ledger.js غير محمّل');
+      const r=L.cashFlow(st.from,st.to);
+      const sec=(t,a,tot)=>`<div class="card" style="margin-top:8px"><b>${t}</b>${a.length?a.map(x=>row(E(x.name),x.amount)).join(''):'<p class="muted">لا حركات</p>'}${row('صافي '+t,tot,1)}</div>`;
+      st.rep={title:'التدفقات النقدية',range:st.from+' → '+st.to,head:['البند','المبلغ'],
+        rows:[['الأنشطة التشغيلية','']].concat(r.operating.map(x=>[x.name,x.amount]),[['صافي التشغيلية',r.opTotal],['الأنشطة الاستثمارية','']],r.investing.map(x=>[x.name,x.amount]),[['صافي الاستثمارية',r.invTotal],['الأنشطة التمويلية','']],r.financing.map(x=>[x.name,x.amount]),[['صافي التمويلية',r.finTotal],['صافي التغير في النقد',r.net],['النقد أول الفترة',r.opening],['النقد آخر الفترة',r.closing]])};
+      body(range()+sec('الأنشطة التشغيلية',r.operating,r.opTotal)+sec('الأنشطة الاستثمارية',r.investing,r.invTotal)+sec('الأنشطة التمويلية',r.financing,r.finTotal)
+        +`<div class="card" style="margin-top:8px">${row('النقد أول الفترة',r.opening)}${row('صافي التغير في النقد',r.net)}${row('النقد آخر الفترة (صندوق + بنوك)',r.closing,1)}</div>`
+        +`<p style="margin-top:8px">${r.reconciled?'✓ الافتتاحي + الصافي = الختامي، ومجموع الأنشطة = الصافي':'<b style="color:#b23f2d">التدفقات غير مطابقة — راجع القيود</b>'}</p><p class="muted" style="font-size:12.5px">طريقة مباشرة مشتقة من القيود المرحّلة على حسابات الصندوق والبنوك.</p>`);
+    },
+    async ag(){
+      const L=root.ORVEX_LED;if(!L||!L.aging)throw new Error('ledger.js غير محمّل');
+      const t=st.agType==='s'?'s':'c',a=L.aging(t,st.to),nm=t==='c'?'العميل':'المورد';
+      const btn=(k,l)=>`<button class="btn ${k===t?'primary':''}" onclick="acAgType('${k}')">${l}</button>`;
+      st.rep={title:t==='c'?'أعمار ديون العملاء':'أعمار ديون الموردين',range:'كما في '+a.asOf,head:[nm].concat(a.labels,['غير مفسَّر','الرصيد']),
+        rows:a.rows.map(r=>[r.name].concat(r.buckets,[r.unallocated,r.balance])).concat([['الإجمالي'].concat(a.totals,[a.unallocatedTotal,a.balanceTotal])])};
+      const late=a.asOf<tdy();
+      body(`<div class="actions no-print" style="margin-bottom:8px">${btn('c','العملاء')}${btn('s','الموردون')}</div><div class="f2"><div><label>كما في تاريخ</label><input type="date" value="${E(st.to)}" onchange="acRange('',this.value)"></div></div>`
+        +(a.rows.length?tbl([[nm]].concat(a.labels.map(l=>[l+' يوم',1]),[['غير مفسَّر',1],['الرصيد',1]]),a.rows.map(r=>'<tr>'+td(E(r.name))+r.buckets.map(v=>td(v?M(v):'—',1)).join('')+td(r.unallocated?M(r.unallocated):'—',1)+td(M(r.balance),1)+'</tr>'),
+          '<tr><td><b>الإجمالي</b></td>'+a.totals.map(v=>td('<b>'+M(v)+'</b>',1)).join('')+td('<b>'+M(a.unallocatedTotal)+'</b>',1)+td('<b>'+M(a.balanceTotal)+'</b>',1)+'</tr>'):'<p class="muted">لا ديون مستحقة.</p>')
+        +`<p class="muted" style="font-size:12.5px">الدفعات والمرتجعات على الرصيد تُسدَّد بها أقدم الفواتير أولًا. «غير مفسَّر» = رصيد افتتاحي أو دفعة زائدة لا تفسّرها المستندات، ويظهر ولا يُخفى.${late?' عمود الرصيد هو الرصيد الحالي، لذا قد يظهر فرق في «غير مفسَّر» عند اختيار تاريخ سابق.':''}</p>`);
+    },
     async je(){
       if(!st.cache||!st.cache.accounts)st.cache={accounts:(await B().accounts()).filter(a=>a.is_active!==false)};
       if(!st.je)st.je={date:tdy(),memo:'',lines:[{a:'',d:'',c:''},{a:'',d:'',c:''}]};
@@ -189,12 +139,11 @@
       <div class="actions"><button class="btn primary" onclick="acAddAccount()">إضافة</button></div><p class="muted" style="font-size:12.5px">الحسابات لا تُحذف؛ يمكن إيقافها فقط. حسابات النظام (الصندوق، المبيعات…) مرتبطة بالترحيل التلقائي.</p>`);
     },
     async pr(){
-      const b=B(),ps=await b.get('acct_periods?shop_id=eq.'+b.shop()+'&select=locked_until,updated_at');
-      const locked=ps[0]&&ps[0].locked_until||null;
-      body(`<div class="card">${locked?'🔒 مقفلة حتى '+E(locked):'لا توجد فترة مقفلة؛ كل التواريخ مفتوحة.'}</div>
-      <h3 style="margin:12px 0 4px">إقفال حتى تاريخ</h3><label>آخر يوم مسموح به في الفترة المقفلة</label><input type="date" id="prUntil" value="${E(locked||tdy())}" min="${E(locked||'1900-01-01')}">
-      <div class="actions"><button class="btn danger" onclick="acClosePeriod()">تأكيد الإقفال</button></div>
-      <p class="muted" style="font-size:12.5px">الإقفال تراكمي ولا يمكن تقليل تاريخ الإقفال أو إعادة فتح فترة سابقة. لن تُقبل قيود بتاريخ يساوي هذا التاريخ أو يسبقه.</p>`);
+      const b=B(),ps=await b.get('acct_periods?shop_id=eq.'+b.shop()+'&select=locked_until'),lk=ps[0]&&ps[0].locked_until;
+      body(`<div class="card">${lk?'<p>🔒 مقفلة حتى <b>'+E(lk)+'</b> (شاملًا). لا تُقبل قيود بتواريخ حتى هذا اليوم.</p>':'<p class="muted">لا فترات مقفلة (كل التواريخ مفتوحة).</p>'}</div>
+      <h3 style="margin:12px 0 4px">إقفال حتى نهاية شهر</h3><input type="month" id="prM" value="${E(tdy().slice(0,7))}">
+      <div class="actions"><button class="btn danger" onclick="acClosePeriod()">إقفال الشهر</button></div>
+      <p class="muted" style="font-size:12.5px">الإقفال تراكمي: يقفل هذا الشهر وكل ما قبله، ولا يمكن إعادة فتحه. صحّح الأخطاء قبل الإقفال.</p>`);
     }
   };
   function jeDraw(){
@@ -240,16 +189,11 @@
     catch(x){root.toast(/23505|duplicate/i.test(String(x&&x.message))?'الرمز مستخدم من قبل':fail(x))}
   };
   root.acClosePeriod=async function(){
-    const until=(document.getElementById('prUntil')?.value||'').trim();
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(until))return root.toast('اختر تاريخًا صحيحًا');
-    const b=B(),current=await b.get('acct_periods?shop_id=eq.'+b.shop()+'&select=locked_until');
-    const locked=current[0]?.locked_until||null;
-    if(locked&&until<locked)return root.toast('لا يمكن تقليل تاريخ الإقفال أو إعادة فتح فترة سابقة');
-    if(!confirm('إقفال جميع القيود حتى '+until+'؟ لا يمكن التراجع عن هذا الإقفال.'))return;
-    try{
-      await b.rpc('set_period_lock',{p_shop:b.shop(),p_until:until});
-      root.toast('تم الإقفال حتى '+until);acTab('pr');
-    }catch(x){root.toast(fail(x))}
+    const m=(document.getElementById('prM').value||'').trim();if(!/^\d{4}-\d{2}$/.test(m))return root.toast('اختر الشهر');
+    if(!confirm('إقفال '+m+' نهائيًا؟ لا يمكن إعادة فتحه ولن تُقبل قيود بتواريخه.'))return;
+    const b=B();
+    try{await b.rpc('set_period_lock',{p_shop:b.shop(),p_until:monthEnd(m)});root.toast('تم إقفال '+m);acTab('pr')}
+    catch(x){root.toast(fail(x))}
   };
   if(typeof vParties==='function'){const _v=vParties;vParties=function(){return _v()+(isAdm()?'<div class="actions"><button class="btn" onclick="acOpen()">📚 المحاسبة</button></div>':'')}}
 })(typeof window!=='undefined'?window:globalThis);

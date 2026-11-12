@@ -79,7 +79,7 @@ function trReceive(id,recv){
     if(rv<0||dm<0)return{err:'كمية سالبة في «'+l.name+'»'};
     if(r2(rv+dm)>l.qty+1e-9)return{err:'المستلم + التالف أكبر من المرسل في «'+l.name+'»'};
     R.push({l,rv,dm,sh:r2(l.qty-rv-dm),note:String(x.note||'').trim()})}
-  R.forEach(({l,rv,dm,sh,note})=>{const p=prod(l.pid);l.recv=rv;l.dmg=dm;l.short=sh;if(note)l.note=note;
+  R.forEach(({l,rv,dm,sh,note})=>{const p=prod(l.pid);l.recv=rv;l.dmg=dm;l.short=sh;if(note)l.note=note;if(p)l.cost=num(p.cost);
     if(!p)return; /* المادة حُذفت أثناء النقل: يبقى السجل فقط */
     const b0=whQty(p,t.to);if(rv>0)whMove(p,t.to,rv);
     histf(p,'transfer',b0,whQty(p,t.to),'استلام '+t.no+' في '+whName(t.to)+(dm?' | تالف '+dm:'')+(sh?' | نقص '+sh:''),{wh:t.to,tr:t.no})});

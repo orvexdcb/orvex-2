@@ -1,3 +1,18 @@
 {
-  "cleanUrls": true
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/__orvex/releases/:releaseId/:path*",
+      "destination": "/api/release-proxy?releaseId=:releaseId&path=:path*"
+    },
+    {
+      "source": "/__orvex/releases/:releaseId/",
+      "destination": "/api/release-proxy?releaseId=:releaseId&path=index.html"
+    },
+    {
+      "source": "/__orvex/releases/:releaseId",
+      "destination": "/api/release-proxy?releaseId=:releaseId&path=index.html"
+    }
+  ]
 }

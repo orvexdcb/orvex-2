@@ -33,6 +33,16 @@
     const total=r2(p.total),paid=Math.min(r2(p.paid),total),rem=r2(total-paid);
     return clean([L('inventory',total,0),L(cashKey(p.method),0,paid),L('ap',0,rem)]);
   }
+  /* مرتجع شراء: يخفض المخزون بتكلفته الأصلية؛ جزء من ذمة المورد (apPart) والباقي نقدًا/بنكًا */
+  function preturnLines(r){
+    const total=r2(r.total),ap=Math.min(r2(r.apPart||0),total),cash=r2(total-ap);
+    return clean([L('ap',ap,0),L(cashKey(r.cashMethod||r.method),cash,0),L('inventory',0,total)]);
+  }
+  /* خسارة نقص/تالف تحويل مستلم: مدين فروق ومخزون تالف، دائن مخزون. التحويل نفسه لا يُرحَّل (لا ربح/خسارة). */
+  function transferLossLines(t){
+    const v=r2((t.lines||[]).reduce((s,l)=>s+((+l.short||0)+(+l.dmg||0))*(+l.cost||0),0));
+    return clean([L('inventory_adjust',v,0),L('inventory',0,v)]);
+  }
   function expenseLines(e){const a=r2(e.amount);return clean([L(e.cat===PAYROLL_CAT?'payroll':'opex',a,0),L('cash',0,a)])}
   function paymentLines(p){const a=r2(p.amount);return p.type==='c'?clean([L('cash',a,0),L('ar',0,a)]):clean([L('ap',a,0),L('cash',0,a)])}
 
@@ -53,6 +63,8 @@
     (db.sales||[]).forEach(s=>{if(s.void)return;guard('sale',s,s.date,'فاتورة '+s.no,saleLines(s))});
     (db.returns||[]).forEach(r=>guard('return',r,r.date,'مرتجع '+r.no,returnLines(r)));
     (db.purchases||[]).forEach(p=>guard('purchase',p,p.date,'مشتريات '+p.no,purchaseLines(p)));
+    (db.preturns||[]).forEach(r=>{if(r.void)return;guard('preturn',r,r.date,'مرتجع شراء '+r.no,preturnLines(r))});
+    (db.transfers||[]).forEach(t=>{if(t.status!=='received')return;const ls=transferLossLines(t);if(!ls.length)return;guard('transfer',t,String(t.recvAt||t.date).slice(0,10),'نقص/تالف تحويل '+t.no,ls)});
     (db.expenses||[]).forEach(e=>guard('expense',e,e.date,'مصروف '+(e.cat||''),expenseLines(e)));
     (db.payments||[]).forEach(p=>guard('payment',p,p.date,p.type==='c'?'تحصيل من عميل':'دفعة لمورد',paymentLines(p)));
     return{entries:out,skipped};
@@ -83,7 +95,7 @@
     return{id:entry.id,entry_date:entry.entry_date,memo:entry.memo,source:entry.source,source_ref:entry.source_ref,created_by:by||'',lines};
   }
 
-  const api={r2,expected,plan,toServerEntry,saleLines,returnLines,purchaseLines,expenseLines,paymentLines};
+  const api={r2,expected,plan,toServerEntry,saleLines,returnLines,purchaseLines,preturnLines,transferLossLines,expenseLines,paymentLines};
   if(typeof module!=='undefined'&&module.exports){module.exports=api;return}
 
   /* ========= طبقة المتصفح ========= */
