@@ -18,8 +18,10 @@
   function ensureUpdateButton(){
     var auth=document.getElementById('auth');
     var card=auth&&auth.querySelector('.auth-card');
-    var login=card&&card.querySelector('#a_user')&&card.querySelector('#a_pass')&&
-      Array.from(card.querySelectorAll('button')).some(function(b){return /doLogin/.test(b.getAttribute('onclick')||'')});
+    /* لا نشترط حقل اسم المستخدم؛ بعض شاشات الدخول تعرض كلمة المرور فقط. */
+    var login=!!(auth&&card&&card.querySelector('#a_pass')&&
+      (card.querySelector('button[onclick*="doLogin"]')||
+       Array.from(card.querySelectorAll('button')).some(function(b){return /دخول|login/i.test((b.textContent||'').trim())})));
     if(!login){
       if(updateButton&&updateButton.parentNode)updateButton.parentNode.removeChild(updateButton);
       updateButton=null;
