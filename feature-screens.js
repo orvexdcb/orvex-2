@@ -245,6 +245,7 @@ function draw(){
 function addStyle(){if(document.getElementById('fsCss'))return;var s=document.createElement('style');s.id='fsCss';s.textContent=CSS;document.head.appendChild(s)}
 function open(code){
  if(!L.CODES.includes(code)){G.toast('لا توجد شاشة لهذه الميزة');return}
+ if(!root.orvexProfile||typeof root.orvexProfile.hasFeature!=='function'||!root.orvexProfile.hasFeature(code)){G.toast('هذه الميزة غير ممنوحة لهذا المحل');return}
  if(!G.user()){G.toast('سجّل الدخول أولًا');return}
  if(!G.can()){G.toast('ليست لديك صلاحية لهذه الشاشة');return}
  if(!G.db()){return}
