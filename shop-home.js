@@ -169,7 +169,9 @@ async function load(sid){
   if(st&&typeof st==='object'&&P.shop===sid){
    S.settings=st;
    const activity=await activityName(sid);
-   S.info={name:shopName(),activity:activity.label,activityCode:activity.code,features:P.features};
+   let granted=[];
+   try{granted=await root.__orvexRequest('/rest/v1/rpc/orvex_my_shop_features',{method:'POST',body:JSON.stringify({p_shop:sid})})||[]}catch(e){}
+   S.info={name:shopName(),activity:activity.label,activityCode:activity.code,features:granted};
   }
  }catch(e){}
  S.done=true;
