@@ -10,8 +10,26 @@
   try{
     if('serviceWorker' in navigator && location.protocol.indexOf('http')===0){
       var hadCtl=!!navigator.serviceWorker.controller;
-      navigator.serviceWorker.addEventListener('controllerchange',function(){if(hadCtl&&!window.__orvexUpdating)showUpdate()});
-      window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})});
+      function watchInstalling(reg){
+        var worker=reg&&reg.installing;
+        if(!worker)return;
+        worker.addEventListener('statechange',function(){
+          if(hadCtl&&worker.state==='installed'&&!window.__orvexUpdating)showUpdate();
+        });
+      }
+      navigator.serviceWorker.addEventListener('controllerchange',function(){
+        if(hadCtl&&!window.__orvexUpdating)showUpdate();
+      });
+      window.addEventListener('load',async function(){
+        try{
+          var reg=await navigator.serviceWorker.register('sw.js',{updateViaCache:'none'});
+          reg.addEventListener('updatefound',function(){watchInstalling(reg)});
+          if(hadCtl&&reg.waiting)showUpdate();
+          if(reg.installing)watchInstalling(reg);
+          try{await reg.update()}catch(e){}
+          if(hadCtl&&reg.waiting)showUpdate();
+        }catch(e){}
+      });
     }
   }catch(e){}
 
