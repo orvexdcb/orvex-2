@@ -551,6 +551,8 @@ const _r2=render;render=function(){_r2.apply(this,arguments);try{enhance()}catch
 })();
 async function boot(){try{await initData()}catch(e){console.error(e)}showAuth();try{const saved=ORVEX_SESS.load();if(saved){const u=document.getElementById('a_user');if(u)u.value=saved.username;if(!ORVEX_SESS.beginRestore()){console.warn('[ORVEX session restore] توقفت المحاولات التلقائية (حارس الحلقات)');toast('تعذّرت استعادة الجلسة تلقائيًا. سجّل الدخول يدويًا.')}else{await window.sbLogin();if(state.user)ORVEX_SESS.endRestore()}}}catch(e){console.warn('[ORVEX session restore]',e)}}
 const VIEWS={home:vHome,pos:()=>'',stock:vStock,parties:vParties,more:vMore,invoices:vInvoices,purchases:vPurchases,expenses:vExpenses,reports:vReports,settings:vSettings,returns:vReturns,users:vUsers,studio:vStudio,closings:vClosings,site:()=>window.vSite()};
+/* إتاحة جدول الشاشات للوحدات الإضافية المحمّلة خارج هذا النطاق */
+window.__orvexViews=VIEWS;
 /* حراسة على مستوى الدوال: تُرفض الاستدعاءات من أي حساب غير المؤسس */
 ['newShopForm','makeShop','shopMenu','saveShopF','delShop','openShop','closeShop','devReqDel','makeDevCodeS','mgrDevices','devOk','devDel','asstForm','asstSave','asstPw','asstPwSave','asstDel','shopForm','saveShop','enterAsManager','downloadPkg','updateCodeModal','makeUpdateCode','makeDevCode'].forEach(n=>{
  const f=window[n];if(typeof f!=='function'||f.__founderOnly)return;

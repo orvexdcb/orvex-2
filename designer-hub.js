@@ -4,7 +4,8 @@
    الأقسام الثلاثة الداخلية تُستخرج من نفس HTML الذي تنتجه وحدات server/mall/feedback/maps، فتبقى
    دوالها وصلاحياتها (isDesigner / founderOK / roleGate) كما هي. */
 (function(){
-if(typeof VIEWS!=='object'||!VIEWS||typeof VIEWS.studio!=='function'||window.__orvexDesignerHub)return;
+const VIEWS=window.__orvexViews;
+if(!VIEWS||typeof VIEWS.studio!=='function'||window.__orvexDesignerHub)return;
 window.__orvexDesignerHub=true;
 
 const ICON={
