@@ -27,6 +27,7 @@ const THEMES={
 };
 const state={shop:'',code:'',label:'',loading:false,ready:false};
 function currentShop(){try{return root.__orvexAcct&&typeof root.__orvexAcct.shop==='function'?root.__orvexAcct.shop():''}catch(e){return ''}}
+function currentView(){try{return typeof state==='object'&&state?state.view:'home'}catch(e){return 'home'}}
 function apply(){
  const code=state.code,theme=THEMES[code];
  const body=document.body,html=document.documentElement;
@@ -41,11 +42,11 @@ function apply(){
  const main=document.getElementById('main');
  if(main){
   main.dataset.activity=code;
-  main.dataset.activityScreen=(root.state&&root.state.view)||'home';
+  main.dataset.activityScreen=currentView();
   const page=main.querySelector('.od-page');
   if(page){
    page.dataset.activity=code;
-   page.dataset.screen=(root.state&&root.state.view)||'home';
+   page.dataset.screen=currentView();
    let strip=page.querySelector('.orvex-activity-context');
    if(!strip){
     strip=document.createElement('div');strip.className='orvex-activity-context';
@@ -80,14 +81,14 @@ async function load(){
 const style=document.createElement('style');
 style.id='orvexActivityUIStyle';
 style.textContent=`
-:root{--brand:var(--activity-brand,var(--brand));--soft:var(--activity-soft,var(--soft))}
+
 .orvex-activity-context{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 12px;padding:9px 12px;border:1px solid color-mix(in srgb,var(--activity-brand) 24%,var(--line));border-inline-start:4px solid var(--activity-brand);border-radius:12px;background:var(--activity-soft);color:var(--activity-ink);font-size:12px}
 .orvex-activity-context__name{font-weight:800}
 .orvex-activity-context__screen{opacity:.72;font-size:11px}
 #main[data-activity] .od-page .btn.primary{background:var(--activity-brand);border-color:var(--activity-brand)}
 #main[data-activity] .od-page .badge:not(.bad):not(.warn){color:var(--activity-brand);background:var(--activity-soft)}
 #main[data-activity] .od-page .card{border-radius:16px}
-#main[data-activity][data-activity-screen="pos"] .od-page{--screen-density:1}
+
 html[data-orvex-shape="luxury"] #main .od-page .card{border-radius:20px;box-shadow:0 5px 18px rgba(80,60,20,.07)}
 html[data-orvex-shape="clinical"] #main .od-page .card{border-radius:10px}
 html[data-orvex-shape="industrial"] #main .od-page .card{border-radius:8px}
