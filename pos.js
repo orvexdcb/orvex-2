@@ -36,6 +36,17 @@ function openPos(){
 function closePos(){clearInterval(_clk);const e=$('#pos');if(e)e.remove();render()}
 function posRender(){const e=$('#pos');if(e)e.innerHTML=posHtml()}
 function focusEntry(){if(window.matchMedia&&window.matchMedia('(pointer:fine)').matches){const e=$('#posEntry');if(e)e.focus()}}
+function posShopSettings(){
+  try{const P=window.orvexProfile,A=window.__orvexAcct,sid=A&&typeof A.shop==='function'?A.shop():'';return P&&sid&&P.shop===sid&&P.settings&&typeof P.settings==='object'?P.settings:{}}catch(e){return {}}
+}
+const POS_TOOL_LABELS={weights:'البيع بالوزن',expiry_alerts:'تنبيه الصلاحية',barcode_scan:'الباركود',sizes_colors:'المقاسات والألوان',variants_matrix:'الموديلات والمتغيرات',serial_tracking:'الأرقام التسلسلية',warranty:'الضمان',repair_orders:'الصيانة',vehicle_fitment:'توافق القطع',part_number_search:'رقم القطعة',delivery_orders:'التوصيل',project_quotes:'عروض المشاريع',installments:'التقسيط',batches:'التشغيلات',gold_pricing:'تسعير الذهب',print_services:'خدمات الطباعة',tables:'الطاولات',orders:'الطلبات',kitchen_display:'طلبات المطبخ',service_orders:'أوامر الخدمة',production_orders:'الإنتاج',bom:'مكونات التصنيع'};
+function posProductSearchText(p){const s=posShopSettings(),fields=Array.isArray(s.product_fields)?s.product_fields:[];return fields.map(f=>{if(!f||!f.key)return '';const v=p&&p[f.key]!==undefined?p[f.key]:(p&&p.custom_fields&&p.custom_fields[f.key]!==undefined?p.custom_fields[f.key]:(p&&p.fields?p.fields[f.key]:null));return v===null||v===undefined?'':String(v)}).join(' ').toLowerCase()}
+function posSpecialtyBar(){
+  const s=posShopSettings(),tools=Array.isArray(s.tools)?s.tools:[],fields=Array.isArray(s.product_fields)?s.product_fields:[],tags=tools.map(k=>POS_TOOL_LABELS[k]||'').filter(Boolean).slice(0,5),names=fields.map(f=>f&&f.label_ar).filter(Boolean).slice(0,4),units=Array.isArray(s.units)?s.units.slice(0,4):[];
+  if(!tags.length&&!names.length&&!units.length)return '';
+  const chips=tags.concat(names.map(x=>'حقل: '+x));
+  return '<div class="pos-specialty" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:7px 10px;margin:0 0 8px;border:1px solid var(--line);border-radius:10px;background:var(--soft);font-size:12px"><b style="margin-inline-end:3px">حسب اختصاص المحل</b>'+chips.map(x=>'<span style="padding:3px 7px;border-radius:20px;background:var(--card);border:1px solid var(--line)">'+esc(x)+'</span>').join('')+(units.length?'<span style="color:var(--muted2)">الوحدات: '+units.map(esc).join('، ')+'</span>':'')+'</div>';
+}
 function tick(){const e=$('#pClock');if(!e)return;const d=new Date(),p=n=>String(n).padStart(2,'0');
   e.textContent=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())+'   '+d.toLocaleDateString('ar',{weekday:'long'})+'   '+p(d.getDate())+'-'+p(d.getMonth()+1)+'-'+d.getFullYear()}
 
@@ -52,6 +63,7 @@ function posHtmlClassic(){
   return `
   <div class="ph"><div class="ph-r">رقم الفاتورة<span class="invno">${esc(st.prefix)}${st.next}</span></div><div class="ph-t">نقطة مبيع</div><div class="ph-l"><a style="cursor:pointer" onclick="switchUser()">${esc((curUser()||{}).name||'')}</a></div></div>
   <div class="pinfo"><span class="logo">${esc(st.name)}</span></div>
+  ${posSpecialtyBar()}
   <div class="pbody">
     <div class="pright">
       <div class="bgrid">
@@ -104,7 +116,7 @@ function posUpdate(){
 }
 
 /* ---- إدخال المواد ---- */
-function matchProds(q){q=q.toLowerCase();return db.products.filter(p=>p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q))}
+function matchProds(q){q=q.toLowerCase();return db.products.filter(p=>p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q)||posProductSearchText(p).includes(q))}
 function entryKey(e){if(e.key==='Enter'){e.preventDefault();doEntry(e.target.value.trim())}}
 function doEntry(q){
   if(!q)return;
@@ -223,7 +235,7 @@ function pickModal(mode){
 }
 function pickHtml(mode){
   const q=($('#pq')?$('#pq').value:'').trim().toLowerCase();
-  const l=db.products.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q)).slice(0,60);
+  const l=db.products.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q)||posProductSearchText(p).includes(q)).slice(0,60);
   if(!l.length)return empty(db.products.length?'لا توجد نتائج':'لا توجد مواد. أضفها من تبويب المخزون.');
   return l.map(p=>{const inner=`<div class="grow"><div class="t">${esc(p.name)}</div><small>${esc(p.sku||p.cat||'')}</small></div><div class="end"><b>${money(p.price)}</b><small>المتوفر: ${p.stock}</small></div>`;
     return mode==='add'?`<button class="row tap" onclick="addCart('${jsq(p.id)}',1,true)">${inner}</button>`:`<div class="row">${inner}</div>`}).join('');
@@ -288,7 +300,7 @@ function posFoot(){const t=calcCart();
   <div class="pst"><span id="pClock"></span><span>NUM</span></div>`}
 function gridTiles(){
   const q=(state.posQ||'').trim().toLowerCase();
-  const l=db.products.filter(p=>(state.posCat==='الكل'||(p.cat||'عام')===state.posCat)&&(!q||p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q)));
+  const l=db.products.filter(p=>(state.posCat==='الكل'||(p.cat||'عام')===state.posCat)&&(!q||p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q)||posProductSearchText(p).includes(q)));
   if(!l.length)return `<div class="gl-empty">${db.products.length?'لا توجد نتائج':'لا توجد مواد. أضفها من تبويب المخزون.'}</div>`;
   return l.map(p=>{const n=(state.cart.find(x=>x.pid===p.id)||{}).qty||0;
     return `<button class="pt ${p.stock<=0?'out':''}" onclick="addCart('${jsq(p.id)}')">${n?`<span class="pt-b">${n}</span>`:''}<b>${esc(p.name)}</b><span class="pt-p">${money(unitPrice(p))}</span><small>${p.stock>0?'المتوفر: '+p.stock:'نفد المخزون'}</small></button>`}).join('');
