@@ -24,7 +24,7 @@ function roleGate(p,o){
   if(a==='create_user'&&!(role==='manager'&&own&&b.role==='staff'&&b.shop_id===own))deny();
   if((a==='reset_password'||a==='delete_user')&&role!=='manager')deny();
   return}
- if(path==='/rest/v1/shops'){if(!(own&&eq('id')===own&&(m==='GET'||m==='PATCH')))deny();return}
+ if(path==='/rest/v1/shops'){if(m==='GET'&&role==='founder')return;if(!(own&&eq('id')===own&&(m==='GET'||m==='PATCH')))deny();return}
  if(path==='/rest/v1/founder_products'||path==='/rest/v1/device_requests')deny();
  if(path==='/rest/v1/devices'){if(!(m==='GET'&&own&&eq('shop_id')===own))deny();return}
  if(path==='/rest/v1/shop_audit'){if(!(m==='GET'&&own&&eq('shop_id')===own))deny();return}
@@ -35,6 +35,7 @@ function roleGate(p,o){
  if(path==='/rest/v1/orvex_business_activities'||path==='/rest/v1/orvex_shop_classification'){if(m!=='GET')deny();return}
  if(path==='/rest/v1/orvex_shop_settings'){if(m!=='GET')deny();return}
  if(path==='/rest/v1/orvex_features'||path==='/rest/v1/orvex_feature_links'){if(m!=='GET')deny();return}
+ if(path==='/rest/v1/orvex_shop_feature_assignments'){if(!(m==='GET'&&((role==='founder')||(own&&eq('shop_id')===own))))deny();return}
  if(path==='/rest/v1/rpc/orvex_set_feature_links')deny();
  if(/^\/rest\/v1\/rpc\/orvex_(reorder|move|delete)_activit/.test(path))deny();
  if(/^\/rest\/v1\/rpc\/mall_(admin_|set_shop|security_audit)/.test(path))deny();
