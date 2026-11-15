@@ -15,20 +15,36 @@
     }
   }catch(e){}
 
+  var updateAvailable=false;
   function showUpdate(){
-    if(document.getElementById('orvexUpd'))return;
-    var b=document.createElement('div');b.id='orvexUpd';
-    b.setAttribute('role','status');
-    b.style.cssText='position:fixed;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 72px);z-index:9999;background:#0c6a64;color:#fff;border-radius:12px;padding:10px 12px;display:flex;gap:8px;align-items:center;font:13px/1.5 "IBM Plex Sans Arabic",sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.25)';
-    var s=document.createElement('span');s.style.flex='1';s.textContent=T('upd');
-    var r=document.createElement('button');r.textContent=T('reload');
-    r.style.cssText='background:#fff;color:#0c6a64;border:0;border-radius:8px;padding:6px 10px;font:inherit;font-weight:600;cursor:pointer';
-    r.addEventListener('click',function(){try{if(typeof window.__orvexPrepareUpdate==='function')window.__orvexPrepareUpdate()}catch(e){}location.reload()});
-    var l=document.createElement('button');l.textContent=T('later');
-    l.style.cssText='background:transparent;color:#fff;border:0;padding:6px;font:inherit;cursor:pointer';
-    l.addEventListener('click',function(){b.remove()});
-    b.appendChild(s);b.appendChild(r);b.appendChild(l);document.body.appendChild(b);
+    updateAvailable=true;
+    var card=document.querySelector('#auth .auth-card');
+    if(!card||document.getElementById('orvexLoginUpdate'))return;
+    var b=document.createElement('button');
+    b.id='orvexLoginUpdate';b.type='button';
+    b.textContent='↻ تحديث البرنامج — إصدار جديد متاح';
+    b.setAttribute('aria-label','تحديث برنامج ORVEX إلى الإصدار الجديد');
+    b.style.cssText='display:flex;width:100%;justify-content:center;align-items:center;gap:8px;margin:18px 0 2px;padding:12px 14px;border:1px solid #087a43;border-radius:12px;background:#087a43;color:#fff;font:700 14px/1.4 "IBM Plex Sans Arabic",sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.16);cursor:pointer';
+    b.addEventListener('click',async function(){
+      var st=typeof window.__orvexStatus==='function'?window.__orvexStatus():null;
+      if(st&&(st.busy||st.dirty)){try{toast('توجد عملية حفظ أو مزامنة جارية. انتظر اكتمالها ثم حدّث البرنامج.')}catch(e){alert('توجد عملية حفظ أو مزامنة جارية. انتظر اكتمالها ثم حدّث البرنامج.')}return}
+      if(!confirm('يتوفر تحديث جديد لـ ORVEX. سيتم تطبيقه وإعادة تحميل شاشة الدخول. لن يتم تسجيل خروجك أو حذف بياناتك. هل تريد المتابعة؟'))return;
+      b.disabled=true;b.textContent='جارٍ تثبيت التحديث…';
+      try{if(typeof window.__orvexPrepareUpdate==='function')window.__orvexPrepareUpdate()}catch(e){}
+      window.__orvexUpdating=true;
+      try{await applyUpdate()}catch(e){}
+      location.reload();
+    });
+    card.appendChild(b);
   }
+  function watchLoginForUpdate(){
+    if(updateAvailable)showUpdate();
+  }
+  try{
+    var mo=new MutationObserver(watchLoginForUpdate);
+    mo.observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+
 
   /* 2) تخزين دائم + تنبيه امتلاء التخزين المحلي */
   try{
@@ -65,35 +81,7 @@
     });
   }
 
-  /* 4) زر تحديث يدوي دائم قبل تسجيل الدخول وبعده، لجميع الأجهزة */
-  function addManualUpdate(){
-    var b=document.getElementById('orvexManualUpdate');
-    /* زر التحديث متاح قبل تسجيل الدخول وبعده؛ لا يعتمد على وجود جلسة. */
-    if(b)return;
-    b=document.createElement('button');b.id='orvexManualUpdate';b.type='button';
-    b.textContent='↻ تحديث البرنامج';
-    b.setAttribute('aria-label','تحديث برنامج ORVEX');
-    b.style.cssText='position:fixed;top:calc(env(safe-area-inset-top,0px) + 58px);inset-inline-end:10px;z-index:99999;border:1px solid #087a43;border-radius:999px;background:#087a43;color:#fff;padding:8px 13px;font:600 12px/1.2 "IBM Plex Sans Arabic",sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.18);cursor:pointer';
-    b.addEventListener('click',async function(){
-      var st=typeof window.__orvexStatus==='function'?window.__orvexStatus():null;
-      if(st&&(st.busy||st.dirty)){try{toast('توجد عملية حفظ أو مزامنة جارية. انتظر اكتمالها ثم حدّث البرنامج.')}catch(e){alert('توجد عملية حفظ أو مزامنة جارية. انتظر اكتمالها ثم حدّث البرنامج.')}return}
-      if(!confirm('سيتم إعادة تحميل ORVEX. تأكد من إكمال أي فاتورة أو تعديل مفتوح. هل تريد المتابعة؟'))return;
-      b.disabled=true;b.textContent='جارٍ التحديث…';
-      /* احفظ رمز الجلسة الحالي قبل إعادة تحميل التطبيق؛ لا تحفظ كلمة المرور ولا بيانات المتجر هنا. */
-      try{if(typeof window.__orvexPrepareUpdate==='function')window.__orvexPrepareUpdate()}catch(e){}
-      window.__orvexUpdating=true;
-      /* انتظر تثبيت وتفعيل النسخة الجديدة من Service Worker (بحد أقصى 10 ثوانٍ) قبل إعادة التحميل؛
-         هذا لا يمس الجلسة ولا يستدعي تسجيل الخروج. عند الفشل نعيد التحميل على أي حال. */
-      try{await applyUpdate()}catch(e){}
-      location.reload();
-    });
-    document.body.appendChild(b);
-  }
-  function updateManualButton(){try{addManualUpdate()}catch(e){}}
-  /* ابدأ الفحص فور تحميل الملف، ولا تعتمد على حدث load وحده حتى لا يفوت إذا كان قد وقع */
-  updateManualButton();
-  setInterval(updateManualButton,1000);
-  window.addEventListener('load',updateManualButton);
+
 
   /* 3) مؤشر حالة المزامنة (للقراءة فقط؛ يظهر بعد تسجيل الدخول للخادم) */
   var pill=null;
