@@ -65,12 +65,10 @@
     });
   }
 
-  /* 4) زر تحديث يدوي دائم بعد تسجيل الدخول، لجميع الأدوار والأجهزة */
+  /* 4) زر تحديث يدوي دائم قبل تسجيل الدخول وبعده، لجميع الأجهزة */
   function addManualUpdate(){
-    var s=typeof window.__orvexStatus==='function'?window.__orvexStatus():null;
-    var logged=!!(s&&s.logged);
     var b=document.getElementById('orvexManualUpdate');
-    if(!logged){if(b)b.remove();return}
+    /* زر التحديث متاح قبل تسجيل الدخول وبعده؛ لا يعتمد على وجود جلسة. */
     if(b)return;
     b=document.createElement('button');b.id='orvexManualUpdate';b.type='button';
     b.textContent='↻ تحديث البرنامج';
