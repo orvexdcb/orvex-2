@@ -35,10 +35,10 @@
               const probe=await fetch('sw.js?orvex-version-probe='+Date.now(),{cache:'no-store'});
               if(probe.ok){
                 const source=await probe.text();
-                const match=source.match(/const\\s+VER\\s*=\\s*['"]([^'"]+)['"]/);
+                const match=source.match(/const\s+VER\s*=\s*['"]([^'"]+)['"]/);
                 if(match){
                   const keys=await caches.keys();
-                  const appCaches=keys.filter(k=>k.startsWith('orvex-root-')||/^orvex-v\\d/.test(k));
+                  const appCaches=keys.filter(k=>k.startsWith('orvex-root-')||/^orvex-v\d/.test(k));
                   if(appCaches.length&&!appCaches.includes(match[1]))showUpdate();
                 }
               }
