@@ -28,6 +28,22 @@
           if(reg.installing)watchInstalling(reg);
           try{await reg.update()}catch(e){}
           if(hadCtl&&reg.waiting)showUpdate();
+          /* احتياط إضافي: قارن نسخة كاش التطبيق بإصدار عامل الخدمة المنشور،
+             حتى لا يفوتنا حدث updatefound في بعض المتصفحات أو عند فتح PWA مباشرة. */
+          if(hadCtl&&window.caches){
+            try{
+              const probe=await fetch('sw.js?orvex-version-probe='+Date.now(),{cache:'no-store'});
+              if(probe.ok){
+                const source=await probe.text();
+                const match=source.match(/const\\s+VER\\s*=\\s*['"]([^'"]+)['"]/);
+                if(match){
+                  const keys=await caches.keys();
+                  const appCaches=keys.filter(k=>k.startsWith('orvex-root-')||/^orvex-v\\d/.test(k));
+                  if(appCaches.length&&!appCaches.includes(match[1]))showUpdate();
+                }
+              }
+            }catch(e){}
+          }
         }catch(e){}
       });
     }
