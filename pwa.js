@@ -31,7 +31,7 @@
     if(!b){b=document.createElement('button');b.id='orvexAlwaysUpdate';b.type='button';}
     b.textContent='↻ تحديث البرنامج';
     b.setAttribute('aria-label','التحقق من تحديثات ORVEX');
-    b.style.cssText='display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin:14px 0 0;padding:11px 15px;border:1px solid #355548;border-radius:999px;background:#15251f;color:#fff;font:700 14px/1.4 "IBM Plex Sans Arabic",sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.12);cursor:pointer;touch-action:manipulation';
+    b.style.cssText='display:flex;position:static;inset:auto;transform:none;float:none;clear:both;align-items:center;justify-content:center;gap:8px;box-sizing:border-box;width:100%;min-height:54px;margin:14px 0 0;padding:14px 18px;border:1px solid #087a43;border-radius:12px;background:#087a43;color:#fff;font:700 17px/1.4 "IBM Plex Sans Arabic",sans-serif;box-shadow:none;cursor:pointer;touch-action:manipulation';
     b.onclick=checkAndApplyUpdate;
     card.appendChild(b);updateButton=b;updateButtonUI();
   }
