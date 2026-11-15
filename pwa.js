@@ -6,80 +6,104 @@
     upd:'تم تحديث التطبيق. أعد التحميل عند الانتهاء من العملية الحالية.',reload:'تحديث الآن',later:'لاحقًا'
   })[k]};
 
-  /* 1) عامل الخدمة + إشعار عند توفر نسخة جديدة (دون إعادة تحميل قسرية أثناء بيع جارٍ) */
-  try{
-    if('serviceWorker' in navigator && location.protocol.indexOf('http')===0){
-      var hadCtl=!!navigator.serviceWorker.controller;
-      function watchInstalling(reg){
-        var worker=reg&&reg.installing;
-        if(!worker)return;
-        worker.addEventListener('statechange',function(){
-          if(hadCtl&&worker.state==='installed'&&!window.__orvexUpdating)showUpdate();
-        });
-      }
-      navigator.serviceWorker.addEventListener('controllerchange',function(){
-        if(hadCtl&&!window.__orvexUpdating)showUpdate();
-      });
-      window.addEventListener('load',async function(){
-        try{
-          var reg=await navigator.serviceWorker.register('sw.js',{updateViaCache:'none'});
-          reg.addEventListener('updatefound',function(){watchInstalling(reg)});
-          if(hadCtl&&reg.waiting)showUpdate();
-          if(reg.installing)watchInstalling(reg);
-          try{await reg.update()}catch(e){}
-          if(hadCtl&&reg.waiting)showUpdate();
-          /* احتياط إضافي: قارن نسخة كاش التطبيق بإصدار عامل الخدمة المنشور،
-             حتى لا يفوتنا حدث updatefound في بعض المتصفحات أو عند فتح PWA مباشرة. */
-          if(hadCtl&&window.caches){
-            try{
-              const probe=await fetch('sw.js?orvex-version-probe='+Date.now(),{cache:'no-store'});
-              if(probe.ok){
-                const source=await probe.text();
-                const match=source.match(/const\s+VER\s*=\s*['"]([^'"]+)['"]/);
-                if(match){
-                  const keys=await caches.keys();
-                  const appCaches=keys.filter(k=>k.startsWith('orvex-root-')||/^orvex-v\d/.test(k));
-                  if(appCaches.length&&!appCaches.includes(match[1]))showUpdate();
-                }
-              }
-            }catch(e){}
-          }
-        }catch(e){}
-      });
-    }
-  }catch(e){}
-
-  var updateAvailable=false;
-  function showUpdate(){
-    updateAvailable=true;
-    var card=document.querySelector('#auth .auth-card');
-    if(!card||document.getElementById('orvexLoginUpdate'))return;
+  /* 1) زر تحديث دائم: يفحص عامل الخدمة عند الطلب ويطبق النسخة الجديدة فقط بعد نقر المستخدم. */
+  var swReg=null, updateAvailable=false, updateButton=null, checking=false;
+  function updateButtonUI(){
+    if(!updateButton)return;
+    updateButton.textContent=updateAvailable?'↻ تحديث البرنامج — تحديث متاح':'↻ تحديث البرنامج';
+    updateButton.setAttribute('aria-label',updateAvailable?'تطبيق تحديث ORVEX المتاح':'التحقق من تحديثات ORVEX');
+    updateButton.style.background=updateAvailable?'#087a43':'#15251f';
+    updateButton.style.borderColor=updateAvailable?'#087a43':'#355548';
+  }
+  function ensureUpdateButton(){
+    if(updateButton&&updateButton.isConnected)return;
+    updateButton=document.getElementById('orvexAlwaysUpdate');
+    if(updateButton)return;
     var b=document.createElement('button');
-    b.id='orvexLoginUpdate';b.type='button';
-    b.textContent='↻ تحديث البرنامج — إصدار جديد متاح';
-    b.setAttribute('aria-label','تحديث برنامج ORVEX إلى الإصدار الجديد');
-    b.style.cssText='display:flex;width:100%;justify-content:center;align-items:center;gap:8px;margin:18px 0 2px;padding:12px 14px;border:1px solid #087a43;border-radius:12px;background:#087a43;color:#fff;font:700 14px/1.4 "IBM Plex Sans Arabic",sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.16);cursor:pointer';
-    b.addEventListener('click',async function(){
+    b.id='orvexAlwaysUpdate';b.type='button';
+    b.textContent='↻ تحديث البرنامج';
+    b.setAttribute('aria-label','التحقق من تحديثات ORVEX');
+    b.style.cssText='position:fixed;left:12px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:9990;display:flex;align-items:center;justify-content:center;gap:7px;max-width:calc(100vw - 24px);padding:11px 15px;border:1px solid #355548;border-radius:999px;background:#15251f;color:#fff;font:700 13px/1.4 "IBM Plex Sans Arabic",sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.25);cursor:pointer;touch-action:manipulation';
+    b.addEventListener('click',checkAndApplyUpdate);
+    document.body.appendChild(b);updateButton=b;updateButtonUI();
+  }
+  function setUpdateAvailable(v){updateAvailable=!!v;updateButtonUI();}
+  function waitForInstall(worker,timeout){
+    return new Promise(function(resolve){
+      if(!worker)return resolve(false);
+      if(worker.state==='installed')return resolve(true);
+      var done=false;function finish(v){if(done)return;done=true;worker.removeEventListener('statechange',changed);resolve(v)}
+      function changed(){if(worker.state==='installed')finish(true);else if(worker.state==='redundant'||worker.state==='activated')finish(false)}
+      worker.addEventListener('statechange',changed);setTimeout(function(){finish(worker.state==='installed')},timeout||12000);
+    });
+  }
+  async function checkForUpdate(){
+    if(!('serviceWorker' in navigator)||location.protocol.indexOf('http')!==0)return false;
+    try{
+      swReg=swReg||await navigator.serviceWorker.getRegistration();
+      if(!swReg)swReg=await navigator.serviceWorker.register('sw.js',{updateViaCache:'none'});
+      if(swReg.waiting){setUpdateAvailable(true);return true}
+      var installing=swReg.installing;
+      try{await swReg.update()}catch(e){}
+      if(swReg.waiting){setUpdateAvailable(true);return true}
+      installing=swReg.installing||installing;
+      if(installing&&await waitForInstall(installing,12000)){
+        await swReg.update().catch(function(){});
+        if(swReg.waiting){setUpdateAvailable(true);return true}
+      }
+      setUpdateAvailable(!!swReg.waiting);
+      return updateAvailable;
+    }catch(e){return false}
+  }
+  async function checkAndApplyUpdate(){
+    if(checking)return;checking=true;ensureUpdateButton();
+    if(updateButton){updateButton.disabled=true;updateButton.textContent='جارٍ التحقق…'}
+    try{
+      var available=await checkForUpdate();
+      if(!available){
+        try{toast('لا يوجد تحديث جديد. برنامج ORVEX محدّث بالفعل.')}catch(e){alert('لا يوجد تحديث جديد. برنامج ORVEX محدّث بالفعل.')}
+        return;
+      }
       var st=typeof window.__orvexStatus==='function'?window.__orvexStatus():null;
-      if(st&&(st.busy||st.dirty)){try{toast('توجد عملية حفظ أو مزامنة جارية. انتظر اكتمالها ثم حدّث البرنامج.')}catch(e){alert('توجد عملية حفظ أو مزامنة جارية. انتظر اكتمالها ثم حدّث البرنامج.')}return}
-      if(!confirm('يتوفر تحديث جديد لـ ORVEX. سيتم تطبيقه وإعادة تحميل شاشة الدخول. لن يتم تسجيل خروجك أو حذف بياناتك. هل تريد المتابعة؟'))return;
-      b.disabled=true;b.textContent='جارٍ تثبيت التحديث…';
+      if(st&&(st.busy||st.dirty)){
+        try{toast('توجد عملية حفظ أو مزامنة جارية. انتظر اكتمالها ثم حدّث البرنامج.')}catch(e){alert('توجد عملية حفظ أو مزامنة جارية. انتظر اكتمالها ثم حدّث البرنامج.')}
+        return;
+      }
+      if(!confirm('يوجد تحديث جديد لـ ORVEX. سيتم تثبيته وإعادة تحميل التطبيق. لن يتم حذف بيانات المحل. هل تريد المتابعة؟'))return;
+      if(updateButton)updateButton.textContent='جارٍ تثبيت التحديث…';
       try{if(typeof window.__orvexPrepareUpdate==='function')window.__orvexPrepareUpdate()}catch(e){}
       window.__orvexUpdating=true;
-      try{await applyUpdate()}catch(e){}
+      await applyUpdate();
       location.reload();
+    }finally{
+      checking=false;
+      if(updateButton){updateButton.disabled=false;updateButtonUI()}
+    }
+  }
+  function watchInstalling(reg){
+    var worker=reg&&reg.installing;if(!worker)return;
+    worker.addEventListener('statechange',function(){
+      if(worker.state==='installed'&&navigator.serviceWorker.controller)setUpdateAvailable(true);
     });
-    card.appendChild(b);
   }
-  function watchLoginForUpdate(){
-    if(updateAvailable)showUpdate();
+  if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0){
+    navigator.serviceWorker.addEventListener('controllerchange',function(){
+      if(window.__orvexUpdating)return;
+      setUpdateAvailable(false);
+    });
+    window.addEventListener('load',async function(){
+      try{
+        swReg=await navigator.serviceWorker.register('sw.js',{updateViaCache:'none'});
+        swReg.addEventListener('updatefound',function(){watchInstalling(swReg)});
+        if(swReg.waiting)setUpdateAvailable(true);
+        if(swReg.installing)watchInstalling(swReg);
+      }catch(e){}
+      ensureUpdateButton();
+    });
   }
-  try{
-    var mo=new MutationObserver(watchLoginForUpdate);
-    mo.observe(document.body,{childList:true,subtree:true});
-  }catch(e){}
-
-
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ensureUpdateButton);
+  else ensureUpdateButton();
+  try{new MutationObserver(ensureUpdateButton).observe(document.documentElement,{childList:true,subtree:true})}catch(e){}
   /* 2) تخزين دائم + تنبيه امتلاء التخزين المحلي */
   try{
     if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(function(){});
