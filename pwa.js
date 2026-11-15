@@ -23,7 +23,7 @@
     b.id='orvexAlwaysUpdate';b.type='button';
     b.textContent='↻ تحديث البرنامج';
     b.setAttribute('aria-label','التحقق من تحديثات ORVEX');
-    b.style.cssText='position:fixed;left:12px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:9990;display:flex;align-items:center;justify-content:center;gap:7px;max-width:calc(100vw - 24px);padding:11px 15px;border:1px solid #355548;border-radius:999px;background:#15251f;color:#fff;font:700 13px/1.4 "IBM Plex Sans Arabic",sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.25);cursor:pointer;touch-action:manipulation';
+    b.style.cssText='position:fixed;left:12px;bottom:calc(82px + env(safe-area-inset-bottom,0px));z-index:9990;display:flex;align-items:center;justify-content:center;gap:7px;max-width:calc(100vw - 24px);padding:11px 15px;border:1px solid #355548;border-radius:999px;background:#15251f;color:#fff;font:700 13px/1.4 "IBM Plex Sans Arabic",sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.25);cursor:pointer;touch-action:manipulation';
     b.addEventListener('click',checkAndApplyUpdate);
     document.body.appendChild(b);updateButton=b;updateButtonUI();
   }
