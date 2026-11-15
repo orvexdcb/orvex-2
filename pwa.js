@@ -90,7 +90,10 @@
     document.body.appendChild(b);
   }
   function updateManualButton(){try{addManualUpdate()}catch(e){}}
-  /* ابدأ الفحص فور تحميل الملف، ولا تعتمد على حدث load وحده حتى لا يفوت إذا كان قد وقع */\n  updateManualButton();\n  setInterval(updateManualButton,1000);\n  window.addEventListener('load',updateManualButton);
+  /* ابدأ الفحص فور تحميل الملف، ولا تعتمد على حدث load وحده حتى لا يفوت إذا كان قد وقع */
+  updateManualButton();
+  setInterval(updateManualButton,1000);
+  window.addEventListener('load',updateManualButton);
 
   /* 3) مؤشر حالة المزامنة (للقراءة فقط؛ يظهر بعد تسجيل الدخول للخادم) */
   var pill=null;
