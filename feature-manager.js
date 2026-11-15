@@ -63,7 +63,8 @@ function listHtml(features,links){
    +'<span class="oam-b'+(sum==='غير مرتبطة'?' off':'')+'">'+E(sum)+'</span>';
   return '<li class="oam-row'+(f.is_active===false?' off':'')+'"><div class="oam-line"><span class="oam-name" style="cursor:default"><span>'+E(f.name_ar)+'</span></span><span class="oam-badges">'+b+'</span></div>'
    +(f.description?'<p class="oam-note" style="margin:4px 8px">'+E(f.description)+'</p>':'')
-   +'<div class="oam-bar"><button type="button" class="oam-btn pri" data-act="link" data-id="'+E(f.id)+'">ربط بالأنشطة</button>'
+   +'<div class="oam-bar"><button type="button" class="oam-btn pri" data-act="link" data-id="'+E(f.id)+'">اقتراحات الأنشطة</button>'
+   +'<button type="button" class="oam-btn pri" data-act="shops" data-id="'+E(f.id)+'">تخصيص المحلات</button>'
    +'<button type="button" class="oam-btn" data-act="edit" data-id="'+E(f.id)+'">تعديل</button>'
    +(f.is_builtin?'':'<button type="button" class="oam-btn danger" data-act="delete" data-id="'+E(f.id)+'">حذف</button>')+'</div></li>';
  }).join('')+'</ul>';
