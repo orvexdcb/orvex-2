@@ -79,7 +79,7 @@ function checklistHtml(tree,selected){
 const rq=(p,o)=>{if(typeof root.__orvexRequest!=='function')return Promise.reject(new Error('خدمة المصادقة غير جاهزة'));return root.__orvexRequest(p,o)};
 const say=m=>{try{root.toast(m)}catch(e){}};
 const founder=()=>!!(root.orvexRole&&typeof root.orvexRole.ok==='function'&&root.orvexRole.ok());
-const S={features:[],links:[],tree:null,sheet:null,busy:false,loaded:false,err:''};
+const S={features:[],links:[],tree:null,shops:[],assignments:[],sheet:null,busy:false,loaded:false,err:''};
 let host=null;
 const $q=id=>document.getElementById(id);
 const setErr=m=>{const e=$q('ofm_e');if(e)e.textContent=m||''};
@@ -97,6 +97,8 @@ async function load(){
   S.features=await fetchAll('/rest/v1/orvex_features?select=id,code,name_ar,description,sort_order,is_active,is_builtin,has_screen&order=sort_order.asc,name_ar.asc');
   S.links=await fetchAll('/rest/v1/orvex_feature_links?select=feature_id,scope,activity_id&order=id.asc');
   S.tree=am.buildTree(await fetchAll('/rest/v1/orvex_business_activities?select=id,parent_id,level,code,name_ar,sort_order,is_active&order=level.asc,sort_order.asc,name_ar.asc'));
+  S.shops=await fetchAll('/rest/v1/shops?select=id,name&order=name.asc');
+  S.assignments=await fetchAll('/rest/v1/orvex_shop_feature_assignments?select=shop_id,feature_id,is_granted,show_in_pos,sort_order&order=shop_id.asc');
   S.loaded=true;
  }catch(e){S.err=friendlyError(e)}
 }
@@ -113,7 +115,7 @@ function paint(){
  else body='<div class="oam-top"><button type="button" class="oam-btn pri" data-act="add"'+(S.busy?' disabled':'')+'>+ ميزة جديدة</button></div>'+listHtml(S.features,S.links);
  host.innerHTML='<div class="oam-back"><div class="oam-panel" dir="rtl" role="dialog" aria-modal="true" aria-label="ميزات الأنشطة">'
   +'<div class="oam-head"><h2>ميزات الأنشطة التجارية</h2><button type="button" class="oam-x" data-act="close" aria-label="إغلاق">✕</button></div>'
-  +'<p class="oam-sub">اربط كل ميزة بكل المحلات أو بأنشطة محددة. يحصل المحل على الميزة إن ارتبطت بنشاطه أو بنشاط أعلى منه. الميزات الجديدة علامات تُبنى شاشاتها لاحقًا، وتظهر «قيد التجهيز» حتى ذلك الحين. لا تتغير بيانات المحلات.</p>'
+  +'<p class="oam-sub">اقتراحات الأنشطة لا تمنح الميزة تلقائيًا. منح الميزة يتم لكل محل على حدة من «تخصيص المحلات»، ويمكن اختيار إظهارها كأيقونة في نقطة البيع إذا كانت لها شاشة فعلية.</p>'
   +body+'</div>'+sheetHtml()+'</div>';
 }
 function sheetHtml(){
@@ -124,6 +126,16 @@ function sheetHtml(){
   +'<label class="oam-l">وصف مختصر <small>(اختياري)</small><textarea id="ofm_desc" rows="3" maxlength="'+LIM.desc+'">'+E(f&&f.description||'')+'</textarea></label>'
   +(f?'<label class="oam-ck"><input type="checkbox" id="ofm_active"'+(f.is_active!==false?' checked':'')+'><span>مفعّلة</span></label>':'')
   +'<p class="oam-err" id="ofm_e" role="alert"></p><div class="oam-act"><button type="button" class="oam-btn pri" data-act="save-feature">'+(f?'حفظ':'إضافة')+'</button><button type="button" class="oam-btn" data-act="sheet-close">إلغاء</button></div></div></div>';
+ if(sh.kind==='shops'&&f){
+  const rows=S.shops.map(shop=>{
+   const a=S.assignments.find(x=>x.shop_id===shop.id&&x.feature_id===f.id&&x.is_granted);
+   const canIcon=!!f.has_screen;
+   return '<div class="oam-shop-row"><b>'+E(shop.name)+'</b><label class="oam-ck"><input type="checkbox" id="ofm_shop_grant_'+E(shop.id)+'"'+(a?' checked':'')+'><span>منح الميزة</span></label>'
+    +(canIcon?'<label class="oam-ck"><input type="checkbox" id="ofm_shop_pos_'+E(shop.id)+'"'+(a&&a.show_in_pos?' checked':'')+(a?'':' disabled')+'><span>إظهارها في نقطة البيع</span></label>':'<small>لا توجد شاشة تشغيل لهذه الميزة بعد</small>')+'</div>';
+  }).join('');
+  return '<div class="oam-sheet"><div class="oam-card" dir="rtl"><h3>تخصيص المحلات: '+E(f.name_ar)+'</h3><p class="oam-note">اختر المحلات التي تحصل على هذه الميزة. تفعيل أيقونة نقطة البيع مستقل عن منح الميزة.</p>'
+   +(rows||'<p class="oam-empty">لا توجد محلات.</p>')+'<p class="oam-err" id="ofm_e" role="alert"></p><div class="oam-act"><button type="button" class="oam-btn pri" data-act="save-shop-assignments">حفظ تخصيص المحلات</button><button type="button" class="oam-btn" data-act="sheet-close">إلغاء</button></div></div></div>';
+ }
  if(sh.kind==='link'&&f){
   const st=linkState(S.links,f.id);
   return '<div class="oam-sheet"><div class="oam-card" dir="rtl"><h3>ربط: '+E(f.name_ar)+'</h3>'
@@ -142,12 +154,14 @@ async function onAction(act,id){
   case 'add':S.sheet={kind:'add'};paint();return;
   case 'edit':if(f){S.sheet={kind:'edit',id:f.id};paint()}return;
   case 'link':if(f){S.sheet={kind:'link',id:f.id};paint()}return;
+  case 'shops':if(f){S.sheet={kind:'shops',id:f.id};paint()}return;
   case 'delete':
    if(!f||f.is_builtin)return;
    if(!root.confirm('حذف الميزة «'+f.name_ar+'» وكل روابطها؟'))return;
    await run(()=>rq('/rest/v1/orvex_features?id=eq.'+encodeURIComponent(f.id)+'&is_builtin=eq.false',{method:'DELETE',headers:{Prefer:'return=minimal'}}),'تم الحذف');return;
   case 'save-feature':return saveFeature();
   case 'save-links':return saveLinks();
+  case 'save-shop-assignments':return saveShopAssignments();
  }
 }
 async function saveFeature(){
@@ -169,6 +183,22 @@ async function saveLinks(){
  const all=$q('ofm_all').checked,ids=Array.from(host.querySelectorAll('input[data-aid]:checked')).map(x=>x.getAttribute('data-aid'));
  S.sheet=null;
  await run(()=>rq('/rest/v1/rpc/orvex_set_feature_links',{method:'POST',body:JSON.stringify({p_feature:f.id,p_all:all,p_activities:ids})}),'حُفظ الربط');
+}
+async function saveShopAssignments(){
+ const f=S.features.find(x=>x.id===S.sheet.id);if(!f)return;
+ const calls=S.shops.map(shop=>{
+  const grant=$q('ofm_shop_grant_'+shop.id);
+  const pos=$q('ofm_shop_pos_'+shop.id);
+  return {shop,granted:grant?grant.checked:false,show:pos?pos.checked:false};
+ });
+ S.sheet=null;
+ await run(async()=>{
+  for(const x of calls){
+   await rq('/rest/v1/rpc/orvex_set_shop_feature',{method:'POST',body:JSON.stringify({
+    p_shop:x.shop.id,p_feature:f.id,p_granted:x.granted,p_show_in_pos:x.granted&&x.show,p_sort_order:100
+   })});
+  }
+ },'تم حفظ منح الميزة للمحلات المحددة');
 }
 function onClick(ev){
  const b=ev.target.closest&&ev.target.closest('[data-act]');if(!b||!host||!host.contains(b)||b.disabled)return;
