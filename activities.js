@@ -7,6 +7,7 @@
    - المرحلة 4: عند تصنيف المحل (أو تغيير تصنيفه) تُنسخ إعدادات نشاطه الافتراضية إلى orvex_shop_settings (دالة apply في القاعدة)؛
      المحل المعدَّل يدويًا لا يُستبدل إلا بزر «إعادة تطبيق». المحلات الحالية لا تُمسّ حتى يُصنَّف المؤسس أحدها.
    - لا يغيّر جدول shops ولا دالة orvex-admin؛ الربط في جدول مستقل.
+   - تصنيف النشاط الرئيسي إلزامي لإنشاء محل جديد؛ عند تعذّر القراءة يتوقف الإنشاء. النشاط الفرعي إلزامي فقط إذا كانت له خيارات، والتخصص الدقيق اختياري.
    - إن لم تُطبَّق migration المرحلة 1 يعمل إنشاء المحل كالمعتاد (القائمة معطّلة مع تنبيه)،
      وإن لم تُطبَّق migration المرحلة 2 أو 3 لا تظهر القائمة الموافقة ويعمل ما قبلها كالسابق. */
 (function(){
@@ -32,7 +33,7 @@ async function loadMain(force){
   const r=await rq('/rest/v1/orvex_business_activities?level=eq.1&is_active=eq.true&select=id,code,name_ar,sort_order&order=sort_order.asc,name_ar.asc');
   if(Array.isArray(r)&&r.length){cache={db:true,items:r};return cache}
  }catch(e){}
- return {db:false,items:FALLBACK};
+ return {db:false,items:FALLBACK,error:'تعذر تحميل التصنيفات من قاعدة البيانات'};
 }
 /* الأنشطة الفرعية (المستوى 2) النشطة؛ قائمة فارغة إن لم تُطبَّق migration المرحلة 2 */
 async function loadSubs(force){
@@ -173,7 +174,11 @@ function inject(afterSel,selId,subId,specId,label,current){
   if(!document.body.contains(sel))return;
   if(!r.db){
    sel.innerHTML='<option value="">غير متاح حاليًا</option>';sel.dataset.db='0';
-   hint.textContent='تصنيف الأنشطة غير مفعّل بعد على قاعدة البيانات (طبّق migration التصنيف). إنشاء المحل يعمل بدونه.';return}
+   hint.textContent='تعذّر تحميل أنواع المحلات من قاعدة البيانات. لا يمكن إنشاء محل دون تصنيف. تحقق من الاتصال والصلاحيات ثم أعد المحاولة.';
+   const retry=document.createElement('button');retry.type='button';retry.className='btn';retry.textContent='إعادة تحميل التصنيفات';
+   retry.addEventListener('click',async()=>{retry.disabled=true;retry.textContent='جارٍ إعادة المحاولة…';cache=null;subCache=null;specCache=null;
+    try{const rr=await loadMain(true);await loadSubs(true);await loadSpecs(true);if(rr.db){sel.dataset.db='1';sel.disabled=false;sel.innerHTML='<option value="">اختر النشاط الرئيسي…</option>'+rr.items.map(x=>'<option value="'+E(x.code)+'">'+E(x.name_ar)+'</option>').join('');hint.textContent='تم تحميل التصنيفات. اختر النشاط الرئيسي.';retry.remove()}else{retry.disabled=false;retry.textContent='إعادة تحميل التصنيفات'}}catch(e){retry.disabled=false;retry.textContent='إعادة تحميل التصنيفات'}});
+   box.appendChild(retry);return}
   sel.dataset.db='1';sel.disabled=false;
   sel.innerHTML='<option value="">اختر النشاط الرئيسي…</option>'+r.items.map(x=>'<option value="'+E(x.code)+'">'+E(x.name_ar)+'</option>').join('');
   sel.addEventListener('change',()=>{hint.textContent='';fillSubs()});
@@ -201,9 +206,10 @@ const _ms=window.makeShop;
 if(typeof _ms==='function')window.makeShop=async function(){
  if(!founder())return _ms.apply(this,arguments);
  const nm=$id('n_s'),name=nm?nm.value.trim():'',p=pick('n_act','n_sub','n_spec'),code=p.code;
- if(p.db&&!p.main){say('اختر النشاط الرئيسي للمحل');return}
- if(p.db&&p.needSub&&!p.sub){say('اختر النشاط الفرعي للمحل');return}
- if(p.db&&p.needSpec&&!p.spec){say('اختر التخصص الدقيق للمحل');return}
+ if(!p.db){say('لا يمكن إنشاء المحل الآن: تعذّر تحميل التصنيفات من قاعدة البيانات. أعد المحاولة بعد استعادة الاتصال.');return}
+ if(!p.main){say('اختر النشاط الرئيسي للمحل');return}
+ if(p.needSub&&!p.sub){say('اختر النشاط الفرعي للمحل');return}
+ /* التخصص الدقيق اختياري؛ عند عدم اختياره يُحفظ النشاط الفرعي */
  const q='/rest/v1/shops?name=eq.'+encodeURIComponent(name)+'&select=id';
  let before=null;
  if(code&&name){try{before=new Set((await rq(q)).map(x=>x.id))}catch(e){}}
@@ -236,7 +242,7 @@ if(typeof _ssf==='function')window.saveShopF=async function(id){
  /* أي تغيير يصل لمستوى له خيارات أدنى يتطلب اختيارها؛ ولا نحفظ المحل قبل ذلك */
  if(p.db&&p.main&&p.code!==orig){
   if(p.needSub&&!p.sub){say('اختر النشاط الفرعي للمحل');return}
-  if(p.needSpec&&!p.spec){say('اختر التخصص الدقيق للمحل');return}
+  /* التخصص الدقيق اختياري عند الإنشاء والتعديل. */
  }
  const r=await _ssf.apply(this,arguments);
  if(p.code&&p.code!==orig&&!$id('sf_n')){
