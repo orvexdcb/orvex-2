@@ -36,6 +36,17 @@ test('all 17 main business activity codes have independent profiles', () => {
   }
 });
 
+test('activity dashboards display only features granted to that shop', () => {
+  const html = api.panelHtml({ layout: 'retail', tools: ['barcode_scan'] }, {
+    name: 'محل اختبار', activity: 'التجارة العامة',
+    activityCode: 'general_trade',
+    features: [{ code: 'barcode_scan', name_ar: 'مسح الباركود', has_screen: true }]
+  }, env);
+  assert.match(html, /ميزات النشاط/);
+  assert.match(html, /مسح الباركود/);
+  assert.doesNotMatch(html, /تسعير الذهب/);
+});
+
 test('resolved sub-activity keeps the actual main activity profile code', () => {
   const r = api.resolveActivityProfile({
     main: { code: 'fashion', name_ar: 'الملابس' },
