@@ -6,7 +6,7 @@
     upd:'تم تحديث التطبيق. أعد التحميل عند الانتهاء من العملية الحالية.',reload:'تحديث الآن',later:'لاحقًا'
   })[k]};
 
-  /* 1) زر تحديث دائم: يفحص عامل الخدمة عند الطلب ويطبق النسخة الجديدة فقط بعد نقر المستخدم. */
+  /* 1) زر التحديث يظهر داخل شاشة تسجيل الدخول فقط، ولا يُنشأ كزر عائم بعد الدخول. */
   var swReg=null, updateAvailable=false, updateButton=null, checking=false;
   function updateButtonUI(){
     if(!updateButton)return;
@@ -16,16 +16,24 @@
     updateButton.style.borderColor=updateAvailable?'#087a43':'#355548';
   }
   function ensureUpdateButton(){
-    if(updateButton&&updateButton.isConnected)return;
-    updateButton=document.getElementById('orvexAlwaysUpdate');
-    if(updateButton)return;
-    var b=document.createElement('button');
-    b.id='orvexAlwaysUpdate';b.type='button';
+    var auth=document.getElementById('auth');
+    var card=auth&&auth.querySelector('.auth-card');
+    var login=card&&card.querySelector('#a_user')&&card.querySelector('#a_pass')&&
+      Array.from(card.querySelectorAll('button')).some(function(b){return /doLogin/.test(b.getAttribute('onclick')||'')});
+    if(!login){
+      if(updateButton&&updateButton.parentNode)updateButton.parentNode.removeChild(updateButton);
+      updateButton=null;
+      var old=document.getElementById('orvexAlwaysUpdate');if(old)old.remove();
+      return;
+    }
+    if(updateButton&&updateButton.isConnected&&updateButton.parentNode===card)return;
+    var b=document.getElementById('orvexAlwaysUpdate');
+    if(!b){b=document.createElement('button');b.id='orvexAlwaysUpdate';b.type='button';}
     b.textContent='↻ تحديث البرنامج';
     b.setAttribute('aria-label','التحقق من تحديثات ORVEX');
-    b.style.cssText='position:fixed;left:12px;bottom:calc(82px + env(safe-area-inset-bottom,0px));z-index:9990;display:flex;align-items:center;justify-content:center;gap:7px;max-width:calc(100vw - 24px);padding:11px 15px;border:1px solid #355548;border-radius:999px;background:#15251f;color:#fff;font:700 13px/1.4 "IBM Plex Sans Arabic",sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.25);cursor:pointer;touch-action:manipulation';
-    b.addEventListener('click',checkAndApplyUpdate);
-    document.body.appendChild(b);updateButton=b;updateButtonUI();
+    b.style.cssText='display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin:14px 0 0;padding:11px 15px;border:1px solid #355548;border-radius:999px;background:#15251f;color:#fff;font:700 14px/1.4 "IBM Plex Sans Arabic",sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.12);cursor:pointer;touch-action:manipulation';
+    b.onclick=checkAndApplyUpdate;
+    card.appendChild(b);updateButton=b;updateButtonUI();
   }
   function setUpdateAvailable(v){updateAvailable=!!v;updateButtonUI();}
   function waitForInstall(worker,timeout){
