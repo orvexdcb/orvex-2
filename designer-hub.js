@@ -7,6 +7,7 @@
 const VIEWS=window.__orvexViews;
 if(!VIEWS||typeof VIEWS.studio!=='function'||window.__orvexDesignerHub)return;
 window.__orvexDesignerHub=true;
+const canManageUpdateCenter=()=>((typeof isDesigner==='function'&&isDesigner())||!!(window.orvexRole&&typeof window.orvexRole.founder==='function'&&window.orvexRole.founder()));
 
 const ICON={
  feedback:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 7.5v4"/><path d="M12 15h.01"/>',
@@ -76,7 +77,7 @@ const _vs=VIEWS.studio;
 VIEWS.studio=function(){
  const h=_vs.apply(this,arguments);
  /* لا نتدخل إلا في لوحة المصمم المرتبطة بالخادم؛ أي حالة أخرى (غير مصمم، فتح محل، وضع محلي) تبقى كما هي */
- if(typeof h!=='string'||!h.includes('id="shopList"')||!isDesigner())return h;
+ if(typeof h!=='string'||!h.includes('id="shopList"')||!canManageUpdateCenter())return h;
  if(state.dsec&&SEC[state.dsec])return sectionHtml(state.dsec,h);
  state.dsec=null;
  setTimeout(paintBadge,80);
