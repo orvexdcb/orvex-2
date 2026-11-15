@@ -114,6 +114,14 @@ function toolList(settings,features){
  old.forEach(x=>{if(!seen.has(x.code))out.push(x)});
  return out;
 }
+/* يربط قالب النشاط برمز النشاط الرئيسي الفعلي للمحل؛ لا يستنتج نشاطًا من الاسم العربي. */
+function resolveActivityProfile(resolved){
+ const r=resolved||{};
+ const main=r.main||null,sub=r.sub||null,spec=r.spec||null;
+ const code=(main&&main.code)||(sub&&sub.code)||(spec&&spec.code)||'';
+ const label=[main,sub,spec].filter(Boolean).map(x=>x.name_ar).join(' ‹ ');
+ return {code,label,profile:ACTIVITY_PROFILES[code]||null,level:spec?'specialty':sub?'sub':'main'};
+}
 function panelHtml(settings,info,env){
  env=env||defaultEnv();info=info||{};
  const fallback=LAYOUT[settings&&settings.layout]?settings.layout:'retail';
@@ -156,8 +164,9 @@ async function activityName(sid){
  try{
   const cur=await A.getShopActivity(sid);if(!cur)return {label:'',code:''};
   const [m,s,p]=await Promise.all([A.loadMain(),A.loadSubs(),A.loadSpecs()]);
-  const r=A.resolve(cur,m.items,s,p),main=r.main||r.sub||r.spec;
-  return {label:[r.main,r.sub,r.spec].filter(Boolean).map(x=>x.name_ar).join(' ‹ '),code:main&&main.code||''};
+  const r=A.resolve(cur,m.items,s,p);
+  const resolved=resolveActivityProfile(r);
+  return {label:resolved.label,code:resolved.code};
  }catch(e){return {label:'',code:''}}
 }
 async function load(sid){
@@ -200,5 +209,5 @@ if(typeof root.render==='function'){
  /* render معرّفة كدالة عامة في core.js؛ إسناد window.render يغيّر الربط العام نفسه */
  try{render=root.render}catch(e){}
 }
-root.__orvexShopHome={defaultEnv,curState,shopName,toolList,tilesFor,kpisFor,panelHtml,LAYOUT,TOOLS,ACTIVITY_PROFILES,refresh:()=>{S.sid=''}};
+root.__orvexShopHome={defaultEnv,curState,shopName,toolList,tilesFor,kpisFor,panelHtml,resolveActivityProfile,LAYOUT,TOOLS,ACTIVITY_PROFILES,refresh:()=>{S.sid=''}};
 })();
