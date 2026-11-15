@@ -101,8 +101,8 @@ const prof={settings:null,shop:null,features:null,
   const sid=window.__orvexAcct&&typeof window.__orvexAcct.shop==='function'?window.__orvexAcct.shop():'';
   if(!sid){this.settings=null;this.shop=null;this.features=null;return null}
   try{const r=await getShopSettings(sid);this.settings=r?r.settings:null}catch(e){this.settings=null}
-  /* المرحلة 6: ميزات المحل الفعلية (مرتبطة بنشاطه أو بأحد آبائه أو بكل المحلات)؛ null إن لم تُطبَّق migration المرحلة 6 */
-  try{const f=await rq('/rest/v1/rpc/orvex_shop_features',{method:'POST',body:JSON.stringify({p_shop:sid})});this.features=Array.isArray(f)?f:null}catch(e){this.features=null}
+  /* ميزات المحل الممنوحة يدويًا فقط؛ اقتراحات النشاط لا تمنح صلاحية تشغيل تلقائية. */
+  try{const f=await rq('/rest/v1/rpc/orvex_my_shop_features',{method:'POST',body:JSON.stringify({p_shop:sid})});this.features=Array.isArray(f)?f:null}catch(e){this.features=null}
   this.shop=sid;return this.settings;
  },
  get(path,def){
@@ -112,7 +112,7 @@ const prof={settings:null,shop:null,features:null,
  },
  has(path,item){const v=this.get(path,[]);return Array.isArray(v)&&v.includes(item)},
  /* ميزة مفعّلة للمحل: من نظام الميزات (المرحلة 6) أو من tools القديمة في الإعدادات */
- hasFeature(code){return (Array.isArray(this.features)&&this.features.some(f=>f.code===code))||this.has('tools',code)}
+ hasFeature(code){return Array.isArray(this.features)&&this.features.some(f=>f.code===code)}
 };
 function addProfilePanel(box,shopId){
  if(!box||$id('sf_prof'))return;
