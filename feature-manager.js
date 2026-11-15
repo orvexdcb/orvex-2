@@ -130,7 +130,7 @@ function sheetHtml(){
  if(sh.kind==='shops'&&f){
   const rows=S.shops.map(shop=>{
    const a=S.assignments.find(x=>x.shop_id===shop.id&&x.feature_id===f.id&&x.is_granted);
-   const canIcon=!!f.has_screen;
+   const L=root.orvexFeatLogic,canIcon=!!f.has_screen&&!!(L&&Array.isArray(L.CODES)&&L.CODES.includes(f.code));
    return '<div class="oam-shop-row"><b>'+E(shop.name)+'</b><label class="oam-ck"><input type="checkbox" id="ofm_shop_grant_'+E(shop.id)+'"'+(a?' checked':'')+'><span>منح الميزة</span></label>'
     +(canIcon?'<label class="oam-ck"><input type="checkbox" id="ofm_shop_pos_'+E(shop.id)+'"'+(a&&a.show_in_pos?' checked':'')+'><span>إظهارها في نقطة البيع</span></label>':'<small>لا توجد شاشة تشغيل لهذه الميزة بعد</small>')+'</div>';
   }).join('');
