@@ -130,7 +130,7 @@ function panelHtml(settings,info,env){
  h+='<div class="sh-section-head"><div><b>ملخص اليوم</b><small>مؤشرات الأداء الأساسية</small></div><span class="sh-type">'+E(profileTitle)+'</span></div>';
  h+='<div class="sh-kpis">'+kp.map(x=>'<div class="sh-kpi"><span>'+E(x.l)+'</span><b class="'+(x.warn?'warn':'')+'">'+E(x.v)+'</b></div>').join('')+'</div>';
  if(tiles.length)h+='<div class="sh-section-head"><div><b>العمليات الرئيسية</b><small>اختصارات حسب طبيعة النشاط</small></div></div><div class="sh-tiles">'+tiles.map(t=>'<button type="button" class="sh-tile '+E(t.color)+'" onclick="'+t.action+'"><b>'+E(t.label)+'</b><small>'+E(t.sub)+'</small><span class="sh-tile-arrow" aria-hidden="true">←</span></button>').join('')+'</div>';
- if(tools.length)h+='<div class="sh-tools"><div class="sh-section-head"><div><b>أدوات وتخصصات النشاط</b><small>الميزات المتاحة لهذا التصنيف</small></div></div><div class="sh-chips">'+tools.map(x=>x.open?'<button type="button" class="sh-chip on" onclick="orvexFeat.open(\''+E(x.code)+'\')">'+E(x.name)+'</button>':'<span class="sh-chip'+(x.ready?' on':'')+'">'+E(x.name)+(x.ready?'':' <i>قيد التجهيز</i>')+'</span>').join('')+'</div></div>';
+ /* الميزات الممنوحة تظهر كأيقونات داخل نقطة البيع فقط. */
  return h+'</section>';
 }
 
