@@ -138,7 +138,8 @@ function panelHtml(settings,info,env){
  h+='<div class="sh-section-head"><div><b>ملخص اليوم</b><small>مؤشرات الأداء الأساسية</small></div><span class="sh-type">'+E(profileTitle)+'</span></div>';
  h+='<div class="sh-kpis">'+kp.map(x=>'<div class="sh-kpi"><span>'+E(x.l)+'</span><b class="'+(x.warn?'warn':'')+'">'+E(x.v)+'</b></div>').join('')+'</div>';
  if(tiles.length)h+='<div class="sh-section-head"><div><b>العمليات الرئيسية</b><small>اختصارات حسب طبيعة النشاط</small></div></div><div class="sh-tiles">'+tiles.map(t=>'<button type="button" class="sh-tile '+E(t.color)+'" onclick="'+t.action+'"><b>'+E(t.label)+'</b><small>'+E(t.sub)+'</small><span class="sh-tile-arrow" aria-hidden="true">←</span></button>').join('')+'</div>';
- /* الميزات الممنوحة تظهر كأيقونات داخل نقطة البيع فقط. */
+ /* أدوات النشاط الممنوحة لهذا المحل فقط؛ لا تُمنح صلاحيات تلقائيًا بسبب القالب. */
+ if(tools.length)h+='<div class="sh-tools"><div class="sh-section-head"><div><b>ميزات النشاط</b><small>الميزات التي منحها المؤسس لهذا المحل</small></div></div><div class="sh-chips">'+tools.map(t=>'<span class="sh-chip '+(t.ready?'on':'')+'">'+E(t.name)+' <i>· '+(t.ready?'متاحة':'قيد التجهيز')+'</i></span>').join('')+'</div></div>';
  return h+'</section>';
 }
 
