@@ -97,18 +97,24 @@
     return new Promise(function(resolve){
       if(!('serviceWorker' in navigator))return resolve();
       var done=false;function fin(){if(!done){done=true;resolve()}}
-      setTimeout(fin,10000);
+      setTimeout(fin,15000);
       navigator.serviceWorker.getRegistration().then(function(reg){
         if(!reg)return fin();
-        function watch(w){
+        function promoteWhenInstalled(w){
           if(!w)return fin();
-          if(w.state==='activated')return fin();
-          w.addEventListener('statechange',function(){if(w.state==='activated')fin()});
+          var promote=function(){
+            if(w.state==='installed'){
+              try{w.postMessage({type:'SKIP_WAITING'})}catch(e){}
+            }
+            if(w.state==='activated')fin();
+          };
+          promote();
+          w.addEventListener('statechange',promote);
         }
-        if(reg.waiting){try{reg.waiting.postMessage({type:'SKIP_WAITING'})}catch(e){}return watch(reg.waiting)}
+        if(reg.waiting)return promoteWhenInstalled(reg.waiting);
         reg.update().then(function(){
-          if(reg.installing)watch(reg.installing);
-          else if(reg.waiting){try{reg.waiting.postMessage({type:'SKIP_WAITING'})}catch(e){}watch(reg.waiting)}
+          if(reg.installing)promoteWhenInstalled(reg.installing);
+          else if(reg.waiting)promoteWhenInstalled(reg.waiting);
           else fin();
         }).catch(fin);
       }).catch(fin);
