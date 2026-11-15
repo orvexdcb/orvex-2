@@ -131,7 +131,7 @@ function sheetHtml(){
    const a=S.assignments.find(x=>x.shop_id===shop.id&&x.feature_id===f.id&&x.is_granted);
    const canIcon=!!f.has_screen;
    return '<div class="oam-shop-row"><b>'+E(shop.name)+'</b><label class="oam-ck"><input type="checkbox" id="ofm_shop_grant_'+E(shop.id)+'"'+(a?' checked':'')+'><span>منح الميزة</span></label>'
-    +(canIcon?'<label class="oam-ck"><input type="checkbox" id="ofm_shop_pos_'+E(shop.id)+'"'+(a&&a.show_in_pos?' checked':'')+(a?'':' disabled')+'><span>إظهارها في نقطة البيع</span></label>':'<small>لا توجد شاشة تشغيل لهذه الميزة بعد</small>')+'</div>';
+    +(canIcon?'<label class="oam-ck"><input type="checkbox" id="ofm_shop_pos_'+E(shop.id)+'"'+(a&&a.show_in_pos?' checked':'')+'><span>إظهارها في نقطة البيع</span></label>':'<small>لا توجد شاشة تشغيل لهذه الميزة بعد</small>')+'</div>';
   }).join('');
   return '<div class="oam-sheet"><div class="oam-card" dir="rtl"><h3>تخصيص المحلات: '+E(f.name_ar)+'</h3><p class="oam-note">اختر المحلات التي تحصل على هذه الميزة. تفعيل أيقونة نقطة البيع مستقل عن منح الميزة.</p>'
    +(rows||'<p class="oam-empty">لا توجد محلات.</p>')+'<p class="oam-err" id="ofm_e" role="alert"></p><div class="oam-act"><button type="button" class="oam-btn pri" data-act="save-shop-assignments">حفظ تخصيص المحلات</button><button type="button" class="oam-btn" data-act="sheet-close">إلغاء</button></div></div></div>';
