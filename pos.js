@@ -319,7 +319,7 @@ function posHtmlGrid(){
     return `<div class="gl ${i===state.sel?'sel':''}" data-i="${i}" onclick="selLine(${i})"><div class="gl-n"><b>${esc(p?p.name:'')}</b><small>${fmt(eff)}${l.dp?' (خصم '+l.dp+'%)':''}</small></div>
     <div class="stepper"><button onclick="stepQty(${i},-1)" aria-label="إنقاص">−</button><span>${l.qty}</span><button onclick="stepQty(${i},1)" aria-label="زيادة">+</button></div>
     <b class="gl-t" id="lt${i}">${fmt(l.qty*l.price)}</b><button class="gl-x" onclick="removeAt(${i})" aria-label="حذف المادة">✕</button></div>`}).join('')||'<div class="gl-empty">اضغط على أي مادة لإضافتها إلى الفاتورة</div>';
-  return posHead()+`
+  return posHead()+posSpecialtyBar()+`
   <div class="gbody">
     <div class="gprod">
       <input class="gsearch" id="posEntry" type="search" autocomplete="off" placeholder="ابحث بالاسم أو امسح الباركود ثم Enter" value="${esc(state.posQ||'')}" oninput="gridSearch(this.value)" onkeydown="gridKey(event)">
