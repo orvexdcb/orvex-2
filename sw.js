@@ -1,10 +1,9 @@
 /* ORVEX service worker: يعمل التطبيق دون إنترنت بعد أول زيارة */
-const VER='orvex-root-v69-20261115-push-receiver';
+const VER='orvex-root-v52-release-center';
 const CLEAN_ROOT_CACHES=VER.startsWith('orvex-root-');
-const CORE=['./','index.html','shopfix.js','shopfix2.js','storage.js','core.js','home.js','pos.js','inventory.js','parties.js','purchases.js','reports.js','demo.js','users.js','closings.js','addon.js','inventory2.js','inventory3.js','ledger.js','finance2.js','loyalty2.js','quotes2.js','isolation.js','safety2.js','loyalty.js','staff2.js','hr2.js','assets3.js','mfg.js','schedrep.js','assets2.js','coupons2.js','reports2.js','session-store.js','preturns.js','server.js','mall.js','scanner.js','sync-ui.js','accounting.js','accounting-ui.js','sync-merge.js','syncq.js','tax.js','quotes.js','feedback.js','theme-toggle-dashboard.js','maps.js','designer-hub.js','update-center.js','activities.js','shop-home.js','activity-manager.js','feature-manager.js','featrecs.js','feature-screens.js','orvex-build.js','vendor/leaflet/leaflet.js','vendor/leaflet/leaflet.css','vendor/leaflet/images/layers.png','vendor/leaflet/images/layers-2x.png','vendor/leaflet/images/marker-icon.png','vendor/leaflet/images/marker-icon-2x.png','vendor/leaflet/images/marker-shadow.png','pwa.js','manifest.webmanifest','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
+const CORE=['./','index.html','shopfix.js','shopfix2.js','storage.js','core.js','home.js','pos.js','inventory.js','parties.js','purchases.js','reports.js','demo.js','users.js','closings.js','addon.js','inventory2.js','inventory3.js','ledger.js','finance2.js','loyalty2.js','quotes2.js','isolation.js','safety2.js','loyalty.js','staff2.js','hr2.js','assets3.js','mfg.js','schedrep.js','assets2.js','coupons2.js','reports2.js','session-store.js','preturns.js','server.js','mall.js','scanner.js','sync-ui.js','accounting.js','accounting-ui.js','sync-merge.js','syncq.js','tax.js','quotes.js','feedback.js','theme-toggle-dashboard.js','maps.js','designer-hub.js','update-center.js','orvex-build.js','vendor/leaflet/leaflet.js','vendor/leaflet/leaflet.css','vendor/leaflet/images/layers.png','vendor/leaflet/images/layers-2x.png','vendor/leaflet/images/marker-icon.png','vendor/leaflet/images/marker-icon-2x.png','vendor/leaflet/images/marker-shadow.png','pwa.js','manifest.webmanifest','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
 self.addEventListener('message',e=>{if(e.data&&e.data.type==='SKIP_WAITING')self.skipWaiting()});
-/* لا نفعّل النسخة الجديدة تلقائيًا؛ زر تحديث تسجيل الدخول يرسل SKIP_WAITING بعد موافقة المستخدم. */
-self.addEventListener('install',e=>{e.waitUntil(caches.open(VER).then(c=>c.addAll(CORE)))});
+self.addEventListener('install',e=>{e.waitUntil(caches.open(VER).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil((CLEAN_ROOT_CACHES?caches.keys().then(k=>Promise.all(k.filter(x=>x!==VER&&(x.startsWith('orvex-root-')||/^orvex-v\d/.test(x))).map(x=>caches.delete(x)))):Promise.resolve()).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{
   const r=e.request,u=new URL(r.url);
@@ -22,44 +21,4 @@ self.addEventListener('fetch',e=>{
   const key=r.mode==='navigate'?'index.html':r;
   e.respondWith(fetch(r.mode==='navigate'?r:new Request(r,{cache:'no-cache'})).then(n=>{if(n.ok){const cp=n.clone();caches.open(VER).then(c=>c.put(key,cp))}return n})
     .catch(()=>caches.match(key).then(h=>h||caches.match('./'))));
-});
-
-
-/* إشعارات دفع ORVEX: استقبال إشعار الإصدار حتى عندما يكون التطبيق مغلقًا */
-self.addEventListener('push', event => {
-  event.waitUntil((async () => {
-    let data = {};
-    try { data = event.data ? event.data.json() : {}; }
-    catch (_) { try { data = { body: event.data ? event.data.text() : '' }; } catch (_) {} }
-    const title = String(data.title || 'تحديث جديد — ORVEX').slice(0, 120);
-    const version = data.version ? String(data.version).slice(0, 40) : '';
-    const options = {
-      body: String(data.body || (version ? 'يتوفر إصدار جديد رقم ' + version + ' من ORVEX.' : 'يتوفر تحديث جديد لتطبيق ORVEX.')).slice(0, 240),
-      icon: './icon-192.png',
-      badge: './icon-192.png',
-      tag: data.tag ? String(data.tag).slice(0, 80) : 'orvex-release',
-      renotify: false,
-      data: { url: data.url || '/', releaseId: data.releaseId || null, version }
-    };
-    await self.registration.showNotification(title, options);
-  })());
-});
-
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  event.waitUntil((async () => {
-    let target = '/';
-    try {
-      const requested = new URL(event.notification.data && event.notification.data.url || '/', self.location.origin);
-      target = requested.origin === self.location.origin ? requested.href : self.location.origin + '/';
-    } catch (_) {}
-    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const client of windows) {
-      if (new URL(client.url).origin === self.location.origin) {
-        await client.navigate(target);
-        return client.focus();
-      }
-    }
-    return self.clients.openWindow(target);
-  })());
 });

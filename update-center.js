@@ -86,7 +86,7 @@ async function act(id,action){
  }catch(e){alert('لم تكتمل العملية: '+e.message)}
 }
 window.orvexUpdateCenter=function(){
- const allowed=(typeof isDesigner==='function'&&isDesigner())||!!(window.orvexRole&&typeof window.orvexRole.founder==='function'&&window.orvexRole.founder());if(!allowed)return toast('مركز التحديثات للمؤسس أو المصمم فقط');
+ if(typeof isDesigner!=='function'||!isDesigner())return toast('مركز التحديثات للمصمم فقط');
  if(typeof window.__orvexRequest!=='function')return toast('خدمة المصادقة غير جاهزة');
  shell();
 };

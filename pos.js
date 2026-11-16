@@ -31,41 +31,11 @@ function openPos(){
   if($('#pos'))return;
   if(!can('pos'))return toast('ليست لديك صلاحية استخدام نقطة البيع');
   const d=document.createElement('div');d.id='pos';d.setAttribute('data-t',db.settings.posTheme||'orvex');document.body.appendChild(d);
-  posRender();tick();_clk=setInterval(tick,1000);focusEntry();loadPosFeatureRows();
-}
-let __posFeatureRows=[],__posFeatureShop='';
-async function loadPosFeatureRows(){
-  const A=window.__orvexAcct,sid=A&&typeof A.shop==='function'?A.shop():'';
-  if(!sid||typeof window.__orvexRequest!=='function')return;
-  try{
-    const rows=await window.__orvexRequest('/rest/v1/rpc/orvex_my_shop_features',{method:'POST',body:JSON.stringify({p_shop:sid})});
-    if(!Array.isArray(rows)||!$('#pos'))return;
-    __posFeatureShop=sid;__posFeatureRows=rows.filter(x=>x&&x.show_in_pos&&x.has_screen);
-    posRender();
-  }catch(e){__posFeatureRows=[];}
+  posRender();tick();_clk=setInterval(tick,1000);focusEntry();
 }
 function closePos(){clearInterval(_clk);const e=$('#pos');if(e)e.remove();render()}
-function posRender(){const e=$('#pos');if(e){e.innerHTML=posHtml();if(!document.getElementById('posFeatureIconCss')){const st=document.createElement('style');st.id='posFeatureIconCss';st.textContent=POS_FEATURE_ICON_CSS;document.head.appendChild(st)}}}
+function posRender(){const e=$('#pos');if(e)e.innerHTML=posHtml()}
 function focusEntry(){if(window.matchMedia&&window.matchMedia('(pointer:fine)').matches){const e=$('#posEntry');if(e)e.focus()}}
-function posShopSettings(){
-  try{const P=window.orvexProfile,A=window.__orvexAcct,sid=A&&typeof A.shop==='function'?A.shop():'';return P&&sid&&P.shop===sid&&P.settings&&typeof P.settings==='object'?P.settings:{}}catch(e){return {}}
-}
-const POS_TOOL_LABELS={weights:'البيع بالوزن',expiry_alerts:'تنبيه الصلاحية',barcode_scan:'الباركود',sizes_colors:'المقاسات والألوان',variants_matrix:'الموديلات والمتغيرات',serial_tracking:'الأرقام التسلسلية',warranty:'الضمان',repair_orders:'الصيانة',vehicle_fitment:'توافق القطع',part_number_search:'رقم القطعة',delivery_orders:'التوصيل',project_quotes:'عروض المشاريع',installments:'التقسيط',batches:'التشغيلات',gold_pricing:'تسعير الذهب',print_services:'خدمات الطباعة',tables:'الطاولات',orders:'الطلبات',kitchen_display:'طلبات المطبخ',service_orders:'أوامر الخدمة',production_orders:'الإنتاج',bom:'مكونات التصنيع'};
-function posProductSearchText(p){const s=posShopSettings(),fields=Array.isArray(s.product_fields)?s.product_fields:[];return fields.map(f=>{if(!f||!f.key)return '';const v=p&&p[f.key]!==undefined?p[f.key]:(p&&p.custom_fields&&p.custom_fields[f.key]!==undefined?p.custom_fields[f.key]:(p&&p.fields?p.fields[f.key]:null));return v===null||v===undefined?'':String(v)}).join(' ').toLowerCase()}
-function posSpecialtyBar(){
-  const s=posShopSettings(),fields=Array.isArray(s.product_fields)?s.product_fields:[],units=Array.isArray(s.units)?s.units.slice(0,4):[];
-  const logic=window.orvexFeatLogic,openable=logic&&Array.isArray(logic.CODES)?logic.CODES:[];
-  const rows=__posFeatureRows.filter(x=>x&&x.show_in_pos&&x.has_screen&&openable.includes(x.code));
-  const glyph={tables:'▦',orders:'☷',kitchen_display:'♨',weights:'⚖',sizes_colors:'◈',variants_matrix:'▦',vehicle_fitment:'⚙',part_number_search:'⌕',gold_pricing:'◆',warranty:'✓',repair_orders:'🔧',service_orders:'✦',delivery_orders:'➜',installments:'◷',project_quotes:'▤',print_services:'▧'};
-  if(!rows.length&&!fields.length&&!units.length)return '';
-  const icons=rows.map(x=>'<button type="button" class="pos-feature-icon" onclick="orvexFeat.open(\''+esc(x.code)+'\')" title="'+esc(x.name_ar)+'"><span aria-hidden="true">'+(glyph[x.code]||'✦')+'</span><b>'+esc(x.name_ar)+'</b></button>').join('');
-  const chips=fields.map(f=>f&&f.label_ar?'حقل: '+f.label_ar:'').filter(Boolean).slice(0,4);
-  return '<div class="pos-specialty" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;padding:8px 10px;margin:0 0 8px;border:1px solid var(--line);border-radius:10px;background:var(--soft);font-size:12px">'
-   +(icons?'<div class="pos-feature-icons" style="display:flex;gap:7px;flex-wrap:wrap;width:100%">'+icons+'</div>':'')
-   +(chips.concat(units.length?['الوحدات: '+units.join('، ')]:[]).map(x=>'<span style="padding:3px 7px;border-radius:20px;background:var(--card);border:1px solid var(--line)">'+esc(x)+'</span>').join(''))
-   +'</div>';
-}
-const POS_FEATURE_ICON_CSS='.pos-feature-icon{display:flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-size:12px;cursor:pointer}.pos-feature-icon span{font-size:17px;color:var(--brand)}.pos-feature-icon:hover{border-color:var(--brand)}';
 function tick(){const e=$('#pClock');if(!e)return;const d=new Date(),p=n=>String(n).padStart(2,'0');
   e.textContent=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())+'   '+d.toLocaleDateString('ar',{weekday:'long'})+'   '+p(d.getDate())+'-'+p(d.getMonth()+1)+'-'+d.getFullYear()}
 
@@ -82,7 +52,6 @@ function posHtmlClassic(){
   return `
   <div class="ph"><div class="ph-r">رقم الفاتورة<span class="invno">${esc(st.prefix)}${st.next}</span></div><div class="ph-t">نقطة مبيع</div><div class="ph-l"><a style="cursor:pointer" onclick="switchUser()">${esc((curUser()||{}).name||'')}</a></div></div>
   <div class="pinfo"><span class="logo">${esc(st.name)}</span></div>
-  ${posSpecialtyBar()}
   <div class="pbody">
     <div class="pright">
       <div class="bgrid">
@@ -135,7 +104,7 @@ function posUpdate(){
 }
 
 /* ---- إدخال المواد ---- */
-function matchProds(q){q=q.toLowerCase();return db.products.filter(p=>p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q)||posProductSearchText(p).includes(q))}
+function matchProds(q){q=q.toLowerCase();return db.products.filter(p=>p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q))}
 function entryKey(e){if(e.key==='Enter'){e.preventDefault();doEntry(e.target.value.trim())}}
 function doEntry(q){
   if(!q)return;
@@ -254,7 +223,7 @@ function pickModal(mode){
 }
 function pickHtml(mode){
   const q=($('#pq')?$('#pq').value:'').trim().toLowerCase();
-  const l=db.products.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q)||posProductSearchText(p).includes(q)).slice(0,60);
+  const l=db.products.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q)).slice(0,60);
   if(!l.length)return empty(db.products.length?'لا توجد نتائج':'لا توجد مواد. أضفها من تبويب المخزون.');
   return l.map(p=>{const inner=`<div class="grow"><div class="t">${esc(p.name)}</div><small>${esc(p.sku||p.cat||'')}</small></div><div class="end"><b>${money(p.price)}</b><small>المتوفر: ${p.stock}</small></div>`;
     return mode==='add'?`<button class="row tap" onclick="addCart('${jsq(p.id)}',1,true)">${inner}</button>`:`<div class="row">${inner}</div>`}).join('');
@@ -319,7 +288,7 @@ function posFoot(){const t=calcCart();
   <div class="pst"><span id="pClock"></span><span>NUM</span></div>`}
 function gridTiles(){
   const q=(state.posQ||'').trim().toLowerCase();
-  const l=db.products.filter(p=>(state.posCat==='الكل'||(p.cat||'عام')===state.posCat)&&(!q||p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q)||posProductSearchText(p).includes(q)));
+  const l=db.products.filter(p=>(state.posCat==='الكل'||(p.cat||'عام')===state.posCat)&&(!q||p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q)));
   if(!l.length)return `<div class="gl-empty">${db.products.length?'لا توجد نتائج':'لا توجد مواد. أضفها من تبويب المخزون.'}</div>`;
   return l.map(p=>{const n=(state.cart.find(x=>x.pid===p.id)||{}).qty||0;
     return `<button class="pt ${p.stock<=0?'out':''}" onclick="addCart('${jsq(p.id)}')">${n?`<span class="pt-b">${n}</span>`:''}<b>${esc(p.name)}</b><span class="pt-p">${money(unitPrice(p))}</span><small>${p.stock>0?'المتوفر: '+p.stock:'نفد المخزون'}</small></button>`}).join('');
@@ -338,7 +307,7 @@ function posHtmlGrid(){
     return `<div class="gl ${i===state.sel?'sel':''}" data-i="${i}" onclick="selLine(${i})"><div class="gl-n"><b>${esc(p?p.name:'')}</b><small>${fmt(eff)}${l.dp?' (خصم '+l.dp+'%)':''}</small></div>
     <div class="stepper"><button onclick="stepQty(${i},-1)" aria-label="إنقاص">−</button><span>${l.qty}</span><button onclick="stepQty(${i},1)" aria-label="زيادة">+</button></div>
     <b class="gl-t" id="lt${i}">${fmt(l.qty*l.price)}</b><button class="gl-x" onclick="removeAt(${i})" aria-label="حذف المادة">✕</button></div>`}).join('')||'<div class="gl-empty">اضغط على أي مادة لإضافتها إلى الفاتورة</div>';
-  return posHead()+posSpecialtyBar()+`
+  return posHead()+`
   <div class="gbody">
     <div class="gprod">
       <input class="gsearch" id="posEntry" type="search" autocomplete="off" placeholder="ابحث بالاسم أو امسح الباركود ثم Enter" value="${esc(state.posQ||'')}" oninput="gridSearch(this.value)" onkeydown="gridKey(event)">

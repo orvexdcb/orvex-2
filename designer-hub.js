@@ -4,18 +4,14 @@
    الأقسام الثلاثة الداخلية تُستخرج من نفس HTML الذي تنتجه وحدات server/mall/feedback/maps، فتبقى
    دوالها وصلاحياتها (isDesigner / founderOK / roleGate) كما هي. */
 (function(){
-const VIEWS=window.__orvexViews;
-if(!VIEWS||typeof VIEWS.studio!=='function'||window.__orvexDesignerHub)return;
+if(typeof VIEWS!=='object'||!VIEWS||typeof VIEWS.studio!=='function'||window.__orvexDesignerHub)return;
 window.__orvexDesignerHub=true;
-const canManageUpdateCenter=()=>((typeof isDesigner==='function'&&isDesigner())||!!(window.orvexRole&&typeof window.orvexRole.founder==='function'&&window.orvexRole.founder()));
 
 const ICON={
  feedback:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 7.5v4"/><path d="M12 15h.01"/>',
  map:'<path d="M12 21.5s-7-6.1-7-11.5a7 7 0 0 1 14 0c0 5.4-7 11.5-7 11.5z"/><circle cx="12" cy="10" r="2.6"/>',
  shops:'<path d="M3.5 9.5 5 4h14l1.5 5.5"/><path d="M3.5 9.5a2.8 2.8 0 0 0 5.5 0 2.8 2.8 0 0 0 6 0 2.8 2.8 0 0 0 5.5 0"/><path d="M5 12.5V20h14v-7.5"/><path d="M10 20v-4.5h4V20"/>',
  assts:'<circle cx="9" cy="8" r="3.4"/><path d="M2.6 20a6.4 6.4 0 0 1 12.8 0"/><circle cx="17.5" cy="9.2" r="2.4"/><path d="M17.2 14.2a5 5 0 0 1 4.3 5.3"/>',
- features:'<path d="M12 2l2.4 5.2 5.6.7-4.1 3.9 1 5.6L12 14.7 7.1 17.4l1-5.6L4 7.9l5.6-.7z"/><path d="M8 21h8"/>',
- activities:'<path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 12.5l9 5 9-5"/><path d="M3 17l9 5 9-5"/>',
  updates:'<path d="M12 3v3m0 12v3M3 12h3m12 0h3"/><path d="M7.05 7.05l2.12 2.12m5.66 5.66 2.12 2.12m0-9.9-2.12 2.12m-5.66 5.66-2.12 2.12"/><circle cx="12" cy="12" r="4"/>' ,
  malls:'<rect x="4.5" y="3" width="15" height="18" rx="1.6"/><path d="M9 7.5h1.5M13.5 7.5H15M9 11.5h1.5M13.5 11.5H15M9 15.5h1.5M13.5 15.5H15"/><path d="M10.5 21v-3h3v3"/>'
 };
@@ -26,8 +22,6 @@ const TILES=[
  {k:'shops',t:'المحلات',s:'shops'},
  {k:'assts',t:'مساعدو المصمم',s:'assts'},
  {k:'malls',t:'المجمعات التجارية',s:'malls'},
- {k:'activities',t:'إدارة أنواع المحلات والأنشطة التجارية',a:'orvexActivityManager'},
- {k:'features',t:'ميزات الأنشطة',a:'orvexFeatureManager'},
  {k:'updates',t:'مركز تحديثات ORVEX',a:'orvexUpdateCenter'}
 ];
 const SEC={
@@ -77,7 +71,7 @@ const _vs=VIEWS.studio;
 VIEWS.studio=function(){
  const h=_vs.apply(this,arguments);
  /* لا نتدخل إلا في لوحة المصمم المرتبطة بالخادم؛ أي حالة أخرى (غير مصمم، فتح محل، وضع محلي) تبقى كما هي */
- if(typeof h!=='string'||!h.includes('id="shopList"')||!canManageUpdateCenter())return h;
+ if(typeof h!=='string'||!h.includes('id="shopList"')||!isDesigner())return h;
  if(state.dsec&&SEC[state.dsec])return sectionHtml(state.dsec,h);
  state.dsec=null;
  setTimeout(paintBadge,80);

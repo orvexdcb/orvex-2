@@ -1,7 +1,7 @@
 /* ================= ORVEX SERVER: ربط Supabase ================= */
 (function(){
 const U='https://dgoimemvaudwayelcrmg.supabase.co',AK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRnb2ltZW12YXVkd2F5ZWxjcm1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MjgzMDMsImV4cCI6MjEwNzMwNDMwM30.0SDYLAwp2st48pG9_lhTWu3RU6iS6zBJRzqMS0-YFx0';
-const MAIN=['products','customers','sales','bundles'],REC=['featRecs','suppliers','purchases','expenses','payments','returns','closings','audit','employees','payroll','attendance','leaves','advances','empPay','assets','coupons','quotes','warehouses','transfers','stocktakes','approvals','journals','coa','bankAccts','bankRecs','loyTx','boms','prodOrders','repScheds','repRuns','preturns'],COLL=MAIN.concat(REC);
+const MAIN=['products','customers','sales','bundles'],REC=['suppliers','purchases','expenses','payments','returns','closings','audit','employees','payroll','attendance','leaves','advances','empPay','assets','coupons','quotes','warehouses','transfers','stocktakes','approvals','journals','coa','bankAccts','bankRecs','loyTx','boms','prodOrders','repScheds','repRuns','preturns'],COLL=MAIN.concat(REC);
 const SB={sess:null,prof:null,shop:null,me:null,dirty:false,busy:false,pt:null,poll:null,retryTimer:null,retryCount:0,authExpired:false,authWarned:false,loggingOut:false,again:false,changeSeq:0};let last={};window.__orvexStatus=()=>({logged:!!SB.sess,dirty:!!SB.dirty,busy:!!SB.busy,retry:SB.retryCount||0,expired:!!SB.authExpired});
 const em=u=>u+'@users.orvex.app';
 /* ===== بوابة الصلاحيات (ORVEX roles) =====
@@ -24,7 +24,7 @@ function roleGate(p,o){
   if(a==='create_user'&&!(role==='manager'&&own&&b.role==='staff'&&b.shop_id===own))deny();
   if((a==='reset_password'||a==='delete_user')&&role!=='manager')deny();
   return}
- if(path==='/rest/v1/shops'){if(m==='GET'&&role==='founder')return;if(!(own&&eq('id')===own&&(m==='GET'||m==='PATCH')))deny();return}
+ if(path==='/rest/v1/shops'){if(!(own&&eq('id')===own&&(m==='GET'||m==='PATCH')))deny();return}
  if(path==='/rest/v1/founder_products'||path==='/rest/v1/device_requests')deny();
  if(path==='/rest/v1/devices'){if(!(m==='GET'&&own&&eq('shop_id')===own))deny();return}
  if(path==='/rest/v1/shop_audit'){if(!(m==='GET'&&own&&eq('shop_id')===own))deny();return}
@@ -32,12 +32,6 @@ function roleGate(p,o){
   if(m==='GET'){if(!((own&&eq('shop_id')===own)||eq('id')))deny();return}
   if(m==='PATCH'){if(!(role==='manager'&&eq('id')))deny();return}
   deny()}
- if(path==='/rest/v1/orvex_business_activities'||path==='/rest/v1/orvex_shop_classification'){if(m!=='GET')deny();return}
- if(path==='/rest/v1/orvex_shop_settings'){if(m!=='GET')deny();return}
- if(path==='/rest/v1/orvex_features'||path==='/rest/v1/orvex_feature_links'){if(m!=='GET')deny();return}
- if(path==='/rest/v1/orvex_shop_feature_assignments'){if(!(m==='GET'&&((role==='founder')||(own&&eq('shop_id')===own))))deny();return}
- if(path==='/rest/v1/rpc/orvex_set_feature_links')deny();
- if(/^\/rest\/v1\/rpc\/orvex_(reorder|move|delete)_activit/.test(path))deny();
  if(/^\/rest\/v1\/rpc\/mall_(admin_|set_shop|security_audit)/.test(path))deny();
 }
 window.orvexRole={ok:founderOK,founder:()=>isFounderAcct(),shopAccount:()=>!!(SB.sess&&SB.prof&&(SB.prof.role==='manager'||SB.prof.role==='staff')),gate:roleGate};
@@ -552,8 +546,6 @@ const _r2=render;render=function(){_r2.apply(this,arguments);try{enhance()}catch
 })();
 async function boot(){try{await initData()}catch(e){console.error(e)}showAuth();try{const saved=ORVEX_SESS.load();if(saved){const u=document.getElementById('a_user');if(u)u.value=saved.username;if(!ORVEX_SESS.beginRestore()){console.warn('[ORVEX session restore] توقفت المحاولات التلقائية (حارس الحلقات)');toast('تعذّرت استعادة الجلسة تلقائيًا. سجّل الدخول يدويًا.')}else{await window.sbLogin();if(state.user)ORVEX_SESS.endRestore()}}}catch(e){console.warn('[ORVEX session restore]',e)}}
 const VIEWS={home:vHome,pos:()=>'',stock:vStock,parties:vParties,more:vMore,invoices:vInvoices,purchases:vPurchases,expenses:vExpenses,reports:vReports,settings:vSettings,returns:vReturns,users:vUsers,studio:vStudio,closings:vClosings,site:()=>window.vSite()};
-/* إتاحة جدول الشاشات للوحدات الإضافية المحمّلة خارج هذا النطاق */
-window.__orvexViews=VIEWS;
 /* حراسة على مستوى الدوال: تُرفض الاستدعاءات من أي حساب غير المؤسس */
 ['newShopForm','makeShop','shopMenu','saveShopF','delShop','openShop','closeShop','devReqDel','makeDevCodeS','mgrDevices','devOk','devDel','asstForm','asstSave','asstPw','asstPwSave','asstDel','shopForm','saveShop','enterAsManager','downloadPkg','updateCodeModal','makeUpdateCode','makeDevCode'].forEach(n=>{
  const f=window[n];if(typeof f!=='function'||f.__founderOnly)return;
