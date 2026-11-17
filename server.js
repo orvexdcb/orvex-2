@@ -1,7 +1,7 @@
 /* ================= ORVEX SERVER: ربط Supabase ================= */
 (function(){
 const U='https://dgoimemvaudwayelcrmg.supabase.co',AK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRnb2ltZW12YXVkd2F5ZWxjcm1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MjgzMDMsImV4cCI6MjEwNzMwNDMwM30.0SDYLAwp2st48pG9_lhTWu3RU6iS6zBJRzqMS0-YFx0';
-const MAIN=['products','customers','sales','bundles'],REC=['suppliers','purchases','expenses','payments','returns','closings','audit','employees','payroll','attendance','leaves','advances','empPay','assets','coupons','quotes','warehouses','transfers','stocktakes','approvals','journals','coa','bankAccts','bankRecs','loyTx','boms','prodOrders','repScheds','repRuns','preturns'],COLL=MAIN.concat(REC);
+const MAIN=['products','customers','sales','bundles'],REC=['suppliers','purchases','expenses','payments','returns','closings','audit','employees','payroll','attendance','leaves','advances','empPay','assets','coupons','quotes','warehouses','transfers','stocktakes','approvals','journals','coa','bankAccts','bankRecs','loyTx','boms','prodOrders','warranties','repairs','deliveries','rtables','rorders','installments','sorders','pjobs','pquotes','repScheds','repRuns','preturns'],COLL=MAIN.concat(REC);
 const SB={sess:null,prof:null,shop:null,me:null,dirty:false,busy:false,pt:null,poll:null,retryTimer:null,retryCount:0,authExpired:false,authWarned:false,loggingOut:false,again:false,changeSeq:0};let last={};window.__orvexStatus=()=>({logged:!!SB.sess,dirty:!!SB.dirty,busy:!!SB.busy,retry:SB.retryCount||0,expired:!!SB.authExpired});
 const em=u=>u+'@users.orvex.app';
 /* ===== بوابة الصلاحيات (ORVEX roles) =====
